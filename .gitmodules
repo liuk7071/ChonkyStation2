@@ -1,0 +1,3 @@
+[submodule "ChonkyStation2/Third party/fmt"]
+	path = ChonkyStation2/Third party/fmt
+	url = https://github.com/fmtlib/fmt.git
