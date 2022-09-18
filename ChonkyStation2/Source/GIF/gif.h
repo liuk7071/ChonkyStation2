@@ -23,7 +23,8 @@ public:
 
 	u8 regs[16];
 	int current_reg = 0;
-	int current_reg_nloop = 0;
+	int current_nloop = 0;
 
-	bool PackedTransfer(u128 qword);
+	void PackedTransfer(u128 qword);
+	void ImageTransfer(u128 qword);
 };

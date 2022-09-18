@@ -13,6 +13,12 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
+    <Filter Include="Source\Third Party">
+      <UniqueIdentifier>{54637f65-67df-4b86-affd-37fa40190a51}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headers\Third Party">
+      <UniqueIdentifier>{711c4dcf-7773-4196-b477-b292f5c913e9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ChonkyStation2.cpp">
@@ -32,6 +38,9 @@
     </ClCompile>
     <ClCompile Include="Source\GIF\gif.cpp">
       <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Third party\gl3w\gl3w.cpp">
+      <Filter>Source\Third Party</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -100,6 +109,9 @@
     </ClInclude>
     <ClInclude Include="Source\GIF\gif.h">
       <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Third party\opengl.h">
+      <Filter>Headers\Third Party</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

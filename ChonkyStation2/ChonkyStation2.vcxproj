@@ -81,6 +81,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(ProjectDir)Third Party\gl3w;$(ProjectDir)Third Party\SDL2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)Third Party\SDL2\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -139,6 +141,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -148,6 +151,7 @@
     <ClCompile Include="Source\GIF\gif.cpp" />
     <ClCompile Include="Source\GS\gs.cpp" />
     <ClCompile Include="Source\Memory\memory.cpp" />
+    <ClCompile Include="Third party\gl3w\gl3w.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\common.h" />
@@ -172,6 +176,7 @@
     <ClInclude Include="Third party\fmt\include\fmt\printf.h" />
     <ClInclude Include="Third party\fmt\include\fmt\ranges.h" />
     <ClInclude Include="Third party\fmt\include\fmt\xchar.h" />
+    <ClInclude Include="Third party\opengl.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

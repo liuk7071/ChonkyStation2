@@ -1,9 +1,11 @@
 #pragma once
 #include "../common.h"
+#include "../../Third party/opengl.h"
 #include <map>
 
 class GS {
 public:
+	GS();
 	std::map<int, std::string> internal_registers {
 		{0x00,		"PRIM"},
 		{0x01,		"RGBAQ"},
@@ -68,6 +70,17 @@ public:
 	u64 display2;
 	u64 csr;
 	u64 imr;
+
+
+	union {
+		u64 raw;
+		BitField<0, 14, u64> src_base_ptr;
+		BitField<16, 6, u64> src_buff_width;
+		BitField<24, 6, u64> src_format;
+		BitField<32, 14, u64> dst_base_ptr;
+		BitField<48, 6, u64> dst_buff_width;
+		BitField<56, 6, u64> dst_format;
+	} bitbltbuf;
 	union {
 		u64 raw;
 		BitField<0, 11, u64> src_x;
@@ -76,4 +89,14 @@ public:
 		BitField<48, 11, u64> dst_y;
 		BitField<59, 2, u64> transmission_order;
 	} trxpos;
+	union {
+		u64 raw;
+		BitField<0, 12, u64> width;
+		BitField<32, 12, u64> height;
+	} trxreg;
+
+	OpenGL::Texture vram;
+	std::vector<u32> transfer_buffer;
+	void PushHWREG(u64 data);
+	void ProcessTransfer();
 };

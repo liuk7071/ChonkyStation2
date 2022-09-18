@@ -1,6 +1,6 @@
 #include "gif.h"
 
-bool GIF::PackedTransfer(u128 qword) {
+void GIF::PackedTransfer(u128 qword) {
 	switch (regs[current_reg]) {
 	case 0xE: {
 		auto reg = qword.b64[1] & 0x7f;
@@ -10,17 +10,26 @@ bool GIF::PackedTransfer(u128 qword) {
 	default:
 		Helpers::Panic("Unimplemented GIF packed transfer register 0x%x\n", regs[current_reg]);
 	}
-	current_reg_nloop--;
-	if (current_reg_nloop == 0) {
-		current_reg_nloop = nloop;
+	current_nloop--;
+	if (current_nloop == 0) {
+		current_nloop = nloop;
 		current_reg++;
 	}
-	return false;
+}
+
+void GIF::ImageTransfer(u128 qword) {
+	if (current_nloop == 1) {
+		has_tag = false;
+		gs->ProcessTransfer();
+	}
+	gs->PushHWREG(qword.b64[0]);
+	gs->PushHWREG(qword.b64[1]);
+	current_nloop--;
 }
 
 void GIF::SendQWord(u128 qword, void* gifptr) {
 	GIF* gif = (GIF*)gifptr;
-	if (gif->current_reg == gif->nregs) gif->has_tag = false;
+	if ((gif->data_format == DataFormat::PACKED) && (gif->current_reg == gif->nregs)) gif->has_tag = false;
 	if (!gif->has_tag) {
 		gif->ParseGIFTag(qword);
 		return;
@@ -29,6 +38,9 @@ void GIF::SendQWord(u128 qword, void* gifptr) {
 		switch (gif->data_format) {
 		case DataFormat::PACKED:
 			gif->PackedTransfer(qword);
+			break;
+		case DataFormat::IMAGE:
+			gif->ImageTransfer(qword);
 			break;
 		default:
 			Helpers::Panic("Unimplemented GIF data format %d\n", gif->data_format);
@@ -58,7 +70,7 @@ void GIF::ParseGIFTag(u128 tag) {
 	has_tag = true;
 	Helpers::Debug(Helpers::Log::GIFd, "Got tag\n");
 	nloop = tag.b64[0] & 0x7fff;
-	current_reg_nloop = nloop;
+	current_nloop = nloop;
 	data_format = (tag.b64[0] >> 58) & 3;
 	nregs = (tag.b64[0] >> 60) & 0xf;
 	current_reg = 0;

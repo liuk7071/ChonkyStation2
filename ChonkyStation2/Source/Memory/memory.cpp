@@ -42,8 +42,8 @@ u32 Memory::Read(u32 vaddr) {
 
 	// GS
 	if (paddr == 0x12001000) {
-		Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
-		return gs->csr;
+		//Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
+		return gs->csr | (1 << 3); // Pretend VSYNC interrupt happened
 	}
 
 	// DMA
