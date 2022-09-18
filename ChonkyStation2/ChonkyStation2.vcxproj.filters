@@ -30,6 +30,9 @@
     <ClCompile Include="Source\GS\gs.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\GIF\gif.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Memory\memory.h">
@@ -93,6 +96,9 @@
       <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="Source\GS\gs.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GIF\gif.h">
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>

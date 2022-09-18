@@ -6,6 +6,7 @@ public:
 	// Components
 	DMA dma;
 	GS gs;
-	Memory memory = Memory(&dma, &gs);
+	GIF gif = GIF(&gs);
+	Memory memory = Memory(&dma, &gif, &gs);
 	EE ee = EE(&memory);
 };

@@ -5,12 +5,21 @@
 template<>
 u8 Memory::Read(u32 vaddr) {
 	// This is temporary, need to handle all the virtual address stuff
-	u32 paddr = vaddr;
+	u32 paddr = vaddr & 0x1FFFFFFF;
 	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
-		u32 data;
+		u8 data;
 		memcpy(&data, &ram[vaddr], 1 * sizeof(u8));
 		return data;
 	}
+	if (paddr >= 0x1fc00000 && paddr <= 0x20000000) {
+		u8 data;
+		memcpy(&data, &bios[paddr - 0x1fc00000], 4 * sizeof(u8));
+		return data;
+	}
+	if (vaddr >= 0x70000000 && vaddr <= 0x70000000 + 16 KB) {
+		return scratchpad[vaddr - 0x70000000];
+	}
+
 	if (paddr == 0x1fc7ff52) {
 		return 2; // 2=NTSC, 3=PAL
 	}
@@ -19,16 +28,28 @@ u8 Memory::Read(u32 vaddr) {
 template<>
 u32 Memory::Read(u32 vaddr) {
 	// This is temporary, need to handle all the virtual address stuff
-	u32 paddr = vaddr;
+	u32 paddr = vaddr & 0x1FFFFFFF;
 	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
 		u32 data;
 		memcpy(&data, &ram[vaddr], 4 * sizeof(u8));
 		return data;
 	}
+	if (paddr >= 0x1fc00000 && paddr <= 0x20000000) {
+		u32 data;
+		memcpy(&data, &bios[paddr - 0x1fc00000], 4 * sizeof(u8));
+		return data;
+	}
+
+	// GS
+	if (paddr == 0x12001000) {
+		Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
+		return gs->csr;
+	}
+
 	// DMA
 	if(paddr == 0x1000a000) {
 		Helpers::Debug(Helpers::Log::DMAd, "(GIF) Read CHCR\n");
-		return dma->GIF.CHCR;
+		return dma->GIF.CHCR.raw;
 	}
 	if (paddr == 0x1000e000) {
 		Helpers::Debug(Helpers::Log::DMAd, "Read CTRL\n");
@@ -38,12 +59,20 @@ u32 Memory::Read(u32 vaddr) {
 		Helpers::Debug(Helpers::Log::DMAd, "Read STAT\n");
 		return dma->STAT;
 	}
-	Helpers::Panic("Unhandled read32 from 0x%08x\n", vaddr);
+
+	if (paddr == 0x1000f130) return 0; // TODO: Don't know what this is
+	if (paddr == 0x10003f88) return 0; // TODO: Don't know what this is
+	if (paddr == 0x10003f90) return 0; // TODO: Don't know what this is
+	if (paddr == 0x10003f98) return 0; // TODO: Don't know what this is
+	if (paddr == 0x10003fa0) return 0; // TODO: Don't know what this is
+	if (paddr == 0x10003fa8) return 0; // TODO: Don't know what this is
+
+	Helpers::Panic("Unhandled read32 from 0x%08x\n", paddr);
 }
 template<>
 u64 Memory::Read(u32 vaddr) {
 	// This is temporary, need to handle all the virtual address stuff
-	u32 paddr = vaddr;
+	u32 paddr = vaddr & 0x1FFFFFFF;
 	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
 		u64 data;
 		memcpy(&data, &ram[vaddr], 8 * sizeof(u8));
@@ -51,7 +80,13 @@ u64 Memory::Read(u32 vaddr) {
 	}
 	if (paddr == 0x12001000) {
 		Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
-		return gs->CSR;
+		return gs->csr;
+	}
+
+	if (vaddr >= 0x70000000 && vaddr <= 0x70000000 + 16 KB) {
+		u64 data;
+		memcpy(&data, &scratchpad[vaddr - 0x70000000], 8 * sizeof(u8));
+		return data;
 	}
 
 	Helpers::Panic("Unhandled read64 from 0x%08x\n", vaddr);
@@ -60,9 +95,18 @@ u64 Memory::Read(u32 vaddr) {
 template<>
 void Memory::Write(u32 vaddr, u8 data) {
 	// This is temporary, need to handle all the virtual address stuff
-	u32 paddr = vaddr;
+	u32 paddr = vaddr & 0x1FFFFFFF;
 	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
 		ram[vaddr] = data;
+		return;
+	}
+	if (vaddr >= 0x70000000 && vaddr <= 0x70000000 + 16 KB) {
+		scratchpad[vaddr - 0x70000000] = data;
+		return;
+	}
+
+	if (paddr == 0x1000f180) {
+		printf("%c", data);
 		return;
 	}
 	Helpers::Panic("Unhandled write8 to 0x%08x\n", vaddr);
@@ -70,15 +114,26 @@ void Memory::Write(u32 vaddr, u8 data) {
 template<>
 void Memory::Write(u32 vaddr, u32 data) {
 	// This is temporary, need to handle all the virtual address stuff
-	u32 paddr = vaddr;
+	u32 paddr = vaddr & 0x1FFFFFFF;
 	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
 		memcpy(&ram[paddr], &data, 4 * sizeof(u8));
 		return;
 	}
+
+	// GS
+	if (paddr == 0x12001000) {
+		Helpers::Debug(Helpers::Log::GSd, "CSR <- 0x%08x\n", data);
+		gs->csr = data;
+		return;
+	}
+
 	// DMA
 	if (paddr == 0x1000a000) {
-		dma->GIF.CHCR = data;
+		dma->GIF.CHCR.raw = data;
 		Helpers::Debug(Helpers::Log::DMAd, "(GIF) CHCR <- 0x%08x\n", data);
+		if (dma->GIF.MaybeStart()) {
+			dma->GIF.DoDMA(&ram[dma->GIF.MADR], &gif->SendQWord, gif);
+		}
 		return;
 	}
 	if (paddr == 0x1000a010) {
@@ -147,45 +202,62 @@ void Memory::Write(u32 vaddr, u32 data) {
 		return;
 	}
 
-	Helpers::Panic("Unhandled write32 to 0x%08x\n", vaddr);
+	if (paddr == 0x1000f100) return; // TODO: Don't know what this is
+	if (paddr == 0x1000f120) return; // TODO: Don't know what this is
+	if (paddr == 0x1000f140) return; // TODO: Don't know what this is
+	if (paddr == 0x1000f150) return; // TODO: Don't know what this is
+	if (paddr == 0x1000f500) return; // TODO: Don't know what this is
+
+	Helpers::Panic("Unhandled write32 to 0x%08x\n", paddr);
 }
 template<>
 void Memory::Write(u32 vaddr, u64 data) {
 	// This is temporary, need to handle all the virtual address stuff
-	u32 paddr = vaddr;
+	u32 paddr = vaddr & 0x1FFFFFFF;
 	if (paddr == 0x12000000) {
 		Helpers::Debug(Helpers::Log::GSd, "PMODE <- 0x%08x\n", data);
-		gs->PMODE = data;
+		gs->pmode = data;
 		return;
 	}
 	if (paddr == 0x12000020) {
 		Helpers::Debug(Helpers::Log::GSd, "SMODE2 <- 0x%08x\n", data);
-		gs->SMODE2 = data;
+		gs->smode2 = data;
 		return;
 	}
 	if (paddr == 0x12000090) {
 		Helpers::Debug(Helpers::Log::GSd, "DISPFB2 <- 0x%08x\n", data);
-		gs->DISPFB2 = data;
+		gs->dispfb2 = data;
 		return;
 	}
 	if (paddr == 0x120000a0) {
 		Helpers::Debug(Helpers::Log::GSd, "DISPLAY2 <- 0x%08x\n", data);
-		gs->DISPLAY2 = data;
+		gs->display2 = data;
 		return;
 	}
 	if (paddr == 0x12001000) {
 		Helpers::Debug(Helpers::Log::GSd, "CSR <- 0x%08x\n", data);
-		gs->CSR = data;
+		gs->csr = data;
+		return;
+	}
+
+	if (vaddr >= 0x70000000 && vaddr <= 0x70000000 + 16 KB) {
+		memcpy(&scratchpad[vaddr - 0x70000000], &data, 8 * sizeof(u8));
 		return;
 	}
 	
-	Helpers::Panic("Unhandled write64 to 0x%08x\n", vaddr);
+	Helpers::Panic("Unhandled write64 to 0x%08x\n", paddr);
+}
+
+void Memory::LoadBIOS(const char* FilePath) {
+	FILE* biosfile = fopen(FilePath, "rb");
+	fseek(biosfile, 0, SEEK_SET);
+	fread(bios, sizeof(u8), 4 MB, biosfile);
 }
 
 // ELF
 // Loads an ELF file into memory and returns the entry point
 u32 Memory::LoadELF(const char* FilePath) {
-	FILE* elf = fopen(FilePath, "r");
+	FILE* elf = fopen(FilePath, "rb");
 	// Read entry point
 	fseek(elf, 0x18, SEEK_SET);
 	u32 e_entry = 0;

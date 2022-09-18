@@ -17,6 +17,12 @@ typedef int8_t   s8;
 typedef int16_t  s16;
 typedef int32_t  s32;
 typedef int64_t  s64;
+union u128 {
+	u64 b64[2];
+	u32 b32[4];
+	u16 b16[8];
+	u8  b8[16];
+};
 
 #define UNITS
 #define KB *1024
@@ -24,12 +30,13 @@ typedef int64_t  s64;
 
 // Helper functions
 namespace Helpers {
-	static const char* Logstr[] = { "[ELF] ", "[EE] ", "[MEM] ", "[DMA] " , "[GS] ", ""};
+	static const char* Logstr[] = { "[ELF] ", "[EE] ", "[MEM] ", "[DMA] ", "[GIF] ", "[GS] ", "" };
 	enum class Log {
 		ELFd,
 		EEd,
 		MEMd,
 		DMAd,
+		GIFd,
 		GSd,
 		NOCOND
 	};
@@ -39,6 +46,7 @@ namespace Helpers {
 //#define LOG_EE
 #define LOG_MEM
 #define LOG_DMA
+#define LOG_GIF
 #define LOG_GS
 	static bool ShouldLog(Log log) {
 		if (log == Log::ELFd) {
@@ -57,6 +65,13 @@ namespace Helpers {
 		}
 		if (log == Log::MEMd) {
 #ifdef LOG_MEM
+			return true;
+#else
+			return false;
+#endif
+		}
+		if (log == Log::GIFd) {
+#ifdef LOG_GIF
 			return true;
 #else
 			return false;
@@ -95,4 +110,4 @@ namespace Helpers {
 		va_end(args);
 		exit(0);
 	}
-}
+} // End namespace Helpers

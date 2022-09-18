@@ -27,19 +27,65 @@ void EE::Execute(Instruction instr) {
 			Helpers::Debug(Helpers::Log::EEd, "srl %s, %s, %d\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rt.Value()].c_str(), instr.sa.Value());
 			break;
 		}
+		case SRA: {
+			gprs[instr.rd].b64[0] = (u64)(s32)((s32)gprs[instr.rt].b32[0] >> instr.sa);
+			Helpers::Debug(Helpers::Log::EEd, "sra %s, %s, %d\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rt.Value()].c_str(), instr.sa.Value());
+			break;
+		}
 		case JR: {
 			branch_pc = gprs[instr.rs].b32[0];
 			Helpers::Debug(Helpers::Log::EEd, "jr %s\n", gpr[instr.rs.Value()].c_str());
+			break;
+		}
+		case JALR: {
+			branch_pc = gprs[instr.rs].b32[0];
+			gprs[instr.rd].b64[0] = (pc + 8);
+			Helpers::Debug(Helpers::Log::EEd, "jalr %s %s\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str());
+			break;
+		}
+		case MOVN: {
+			if ((gprs[instr.rt].b64[0] != 0) && (gprs[instr.rt].b64[1] != 0)) gprs[instr.rd] = gprs[instr.rs];
+			Helpers::Debug(Helpers::Log::EEd, "movn %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case SYSCALL: {
 			Syscall(gprs[3].b64[0]);
 			break;
 		}
+		case SYNC: {
+			Helpers::Debug(Helpers::Log::EEd, "sync\n");
+			break;
+		}
+		case MFLO: {
+			gprs[instr.rd].b64[0] = lo.b64[0];
+			Helpers::Debug(Helpers::Log::EEd, "mflo %s\n", gpr[instr.rd.Value()].c_str());
+			break;
+		}
+		case MULT: {
+			s64 result = (s32)gprs[instr.rs].b32[0] * (s32)gprs[instr.rt].b32[0];
+			lo.b64[0] = (u64)(s32)(result & 0xffffffff);
+			lo.b64[0] = (u64)(s32)((result >> 32) & 0xffffffff);
+			Helpers::Debug(Helpers::Log::EEd, "mult %s %s\n", gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+			break;
+		}
+		case DIVU: {
+			u32 quotient = gprs[instr.rs].b32[0] / gprs[instr.rt].b32[0];
+			u32 remainder = gprs[instr.rs].b32[0] % gprs[instr.rt].b32[0];
+			lo.b64[0] = (u64)(s32)quotient;
+			hi.b64[0] = (u64)(s32)remainder;
+			Helpers::Debug(Helpers::Log::EEd, "divu %s %s\n", gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+			break;
+		}
 		case ADDU: {
 			u32 result = gprs[instr.rs].b32[0] + gprs[instr.rt].b32[0];
 			gprs[instr.rd].b64[0] = (u64)(s32)result;
-			Helpers::Debug(Helpers::Log::EEd, "add %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			Helpers::Debug(Helpers::Log::EEd, "addu %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			break;
+		}
+		case SUBU: {
+			u32 result = gprs[instr.rs].b32[0] - gprs[instr.rt].b32[0];
+			gprs[instr.rd].b64[0] = (u64)(s32)result;
+			Helpers::Debug(Helpers::Log::EEd, "subu %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case AND: {
@@ -50,6 +96,21 @@ void EE::Execute(Instruction instr) {
 		case OR: {
 			gprs[instr.rd].b64[0] = (gprs[instr.rs].b64[0] | gprs[instr.rt].b64[0]);
 			Helpers::Debug(Helpers::Log::EEd, "or %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			break;
+		}
+		case SLT: {
+			gprs[instr.rd].b64[0] = ((s64)gprs[instr.rs].b64[0] < (s64)gprs[instr.rt].b64[0]);
+			Helpers::Debug(Helpers::Log::EEd, "slt %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			break;
+		}
+		case SLTU: {
+			gprs[instr.rd].b64[0] = (gprs[instr.rs].b64[0] < gprs[instr.rt].b64[0]);
+			Helpers::Debug(Helpers::Log::EEd, "sltu %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			break;
+		}
+		case DADDU: {
+			gprs[instr.rd].b64[0] = gprs[instr.rs].b64[0] + gprs[instr.rt].b64[0];
+			Helpers::Debug(Helpers::Log::EEd, "daddu %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case DSLL: {
@@ -66,6 +127,20 @@ void EE::Execute(Instruction instr) {
 			Helpers::Panic("Unimplemented SPECIAL instruction 0x%02x @ 0x%08x\n", instr.raw & 0x3f, pc);
 		}
 		break;
+	}
+	case REGIMM: {
+		switch (instr.rt) {
+		case BGEZ: {
+			u32 offset = instr.imm;
+			if ((s64)gprs[instr.rs].b64[0] >= 0) {
+				branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+			}
+			Helpers::Debug(Helpers::Log::EEd, "bgez %s, 0x%04x\n", gpr[instr.rs.Value()], offset);
+			break;
+		}
+		default:
+			Helpers::Panic("Unimplemented REGIMM instruction 0x%02x @ 0x%08x\n", instr.rt.Value(), pc);
+		}
 	}
 	case J: {
 		u32 offset = instr.jump_imm;
@@ -96,9 +171,35 @@ void EE::Execute(Instruction instr) {
 		Helpers::Debug(Helpers::Log::EEd, "bne %s, %s, 0x%04x\n", gpr[instr.rs.Value()], gpr[instr.rt.Value()], offset);
 		break;
 	}
+	case BLEZ: {
+		u32 offset = instr.imm;
+		if ((s64)gprs[instr.rs].b64[0] <= 0) {
+			branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+		}
+		Helpers::Debug(Helpers::Log::EEd, "blez %s, 0x%04x\n", gpr[instr.rs.Value()], offset);
+		break;
+	}
+	case BGTZ: {
+		u32 offset = instr.imm;
+		if ((s64)gprs[instr.rs].b64[0] > 0) {
+			branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+		}
+		Helpers::Debug(Helpers::Log::EEd, "bgtz %s, 0x%04x\n", gpr[instr.rs.Value()], offset);
+		break;
+	}
 	case ADDIU: {
 		gprs[instr.rt].b64[0] = (u64)(gprs[instr.rs].b64[0] + (u64)(s16)instr.imm);
 		Helpers::Debug(Helpers::Log::EEd, "addiu %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
+		break;
+	}
+	case SLTI: {
+		gprs[instr.rt].b64[0] = ((s64)gprs[instr.rs].b64[0] < (s64)(s16)instr.imm);
+		Helpers::Debug(Helpers::Log::EEd, "slti %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
+		break;
+	}
+	case SLTIU: {
+		gprs[instr.rt].b64[0] = (gprs[instr.rs].b64[0] < (s64)(s16)instr.imm);
+		Helpers::Debug(Helpers::Log::EEd, "sltiu %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
 		break;
 	}
 	case ANDI: {
@@ -116,6 +217,35 @@ void EE::Execute(Instruction instr) {
 		Helpers::Debug(Helpers::Log::EEd, "lui %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value());
 		break;
 	}
+	case COP0: {
+		switch ((instr.raw >> 21) & 0x1f) {
+		case MFC0: {
+			// Stubbed
+			if (instr.rd == 15) gprs[instr.rt].b64[0] = 0x69;
+			Helpers::Debug(Helpers::Log::EEd, "mfc0 %s, cop0r%d\n", gpr[instr.rt.Value()].c_str(), instr.rd.Value());
+			break;
+		}
+		case MTC0: {
+			// Stubbed
+			Helpers::Debug(Helpers::Log::EEd, "mtc0 %s, cop0r%d\n", gpr[instr.rt.Value()].c_str(), instr.rd.Value());
+			break;
+		}
+		case TLB: {
+			switch (instr.raw & 0x3f) {
+			case TLBWI: {
+				Helpers::Debug(Helpers::Log::EEd, "tlbwi\n");
+				break;
+			}
+			default:
+				Helpers::Panic("Unimplemented TLB/Exception instruction 0x%02x @ 0x%08x\n", instr.raw & 0x3f, pc);
+			}
+			break;
+		}
+		default:
+			Helpers::Panic("Unimplemented COP0 instruction 0x%02x @ 0x%08x\n", (instr.raw >> 21) & 0x1f, pc);
+		}
+		break;
+	}
 	case BEQL: {
 		u32 offset = instr.imm;
 		if (gprs[instr.rs].b64[0] == gprs[instr.rt].b64[0]) {
@@ -125,6 +255,17 @@ void EE::Execute(Instruction instr) {
 			pc += 4;
 		}
 		Helpers::Debug(Helpers::Log::EEd, "beql %s, %s, 0x%04x\n", gpr[instr.rs.Value()], gpr[instr.rt.Value()], offset);
+		break;
+	}
+	case BNEL: {
+		u32 offset = instr.imm;
+		if (gprs[instr.rs].b64[0] != gprs[instr.rt].b64[0]) {
+			branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+		}
+		else {
+			pc += 4;
+		}
+		Helpers::Debug(Helpers::Log::EEd, "bnel %s, %s, 0x%04x\n", gpr[instr.rs.Value()], gpr[instr.rt.Value()], offset);
 		break;
 	}
 	case LB: {
@@ -182,6 +323,10 @@ void EE::Execute(Instruction instr) {
 		Helpers::Debug(Helpers::Log::EEd, "ld %s, 0x%04x(%s) ; %s <- mem[0x%08x] (0x%04x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data);
 		break;
 	}
+	case SWC1: {
+		Helpers::Debug(Helpers::Log::EEd, "swc1\n");
+		break;
+	}
 	case SD: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
 		if (address & 3) {
@@ -213,7 +358,7 @@ void EE::SetGsCrt(bool interlaced, int display_mode, bool frame) {
 	Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) SetGsCrt [IGNORED]\n");
 }
 void EE::GsPutIMR(u64 value) {
-	mem->gs->IMR = value;
+	mem->gs->imr = value;
 	Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) GsPutIMR(0x%016x);\n", value);
 }
 
@@ -225,5 +370,5 @@ void EE::Step() {
 	Instruction instruction;
 	instruction.raw = instr;
 	Execute(instruction);
-	if(branch_pc != std::nullopt)Helpers::Debug(Helpers::Log::EEd, "[delayed] ");
+	//if(branch_pc != std::nullopt) Helpers::Debug(Helpers::Log::EEd, "[delayed] ");
 }
