@@ -18,12 +18,12 @@ void GIF::PackedTransfer(u128 qword) {
 }
 
 void GIF::ImageTransfer(u128 qword) {
-	if (current_nloop == 1) {
-		has_tag = false;
-		gs->ProcessTransfer();
-	}
 	gs->PushHWREG(qword.b64[0]);
 	gs->PushHWREG(qword.b64[1]);
+	if (current_nloop == 1) {
+		has_tag = false;
+		gs->ProcessUpload();
+	}
 	current_nloop--;
 }
 
@@ -67,9 +67,13 @@ void GIF::ParseGIFTag(u128 tag) {
 	  64-127  Register field, 4 bits each
 	*/
 
-	has_tag = true;
 	Helpers::Debug(Helpers::Log::GIFd, "Got tag\n");
 	nloop = tag.b64[0] & 0x7fff;
+	has_tag = nloop;
+	if (!has_tag) {
+		Helpers::Debug(Helpers::Log::GIFd, "NLOOP == 0, no further processing\n");
+		return;
+	}
 	current_nloop = nloop;
 	data_format = (tag.b64[0] >> 58) & 3;
 	nregs = (tag.b64[0] >> 60) & 0xf;

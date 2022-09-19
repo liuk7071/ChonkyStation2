@@ -26,6 +26,27 @@ u8 Memory::Read(u32 vaddr) {
 	Helpers::Panic("Unhandled read8 from 0x%08x\n", vaddr);
 }
 template<>
+u16 Memory::Read(u32 vaddr) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
+		u16 data;
+		memcpy(&data, &ram[vaddr], 1 * sizeof(u16));
+		return data;
+	}
+	if (paddr >= 0x1fc00000 && paddr <= 0x20000000) {
+		u16 data;
+		memcpy(&data, &bios[paddr - 0x1fc00000], 4 * sizeof(u16));
+		return data;
+	}
+	if (vaddr >= 0x70000000 && vaddr <= 0x70000000 + 16 KB) {
+		u16 data;
+		memcpy(&data, &scratchpad[vaddr - 0x70000000], 4 * sizeof(u16));
+		return data;
+	}
+	Helpers::Panic("Unhandled read16 from 0x%08x\n", vaddr);
+}
+template<>
 u32 Memory::Read(u32 vaddr) {
 	// This is temporary, need to handle all the virtual address stuff
 	u32 paddr = vaddr & 0x1FFFFFFF;
@@ -112,11 +133,21 @@ void Memory::Write(u32 vaddr, u8 data) {
 	Helpers::Panic("Unhandled write8 to 0x%08x\n", vaddr);
 }
 template<>
+void Memory::Write(u32 vaddr, u16 data) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
+		memcpy(&ram[paddr], &data, sizeof(u16));
+		return;
+	}
+	Helpers::Panic("Unhandled write16 to 0x%08x\n", vaddr);
+}
+template<>
 void Memory::Write(u32 vaddr, u32 data) {
 	// This is temporary, need to handle all the virtual address stuff
 	u32 paddr = vaddr & 0x1FFFFFFF;
 	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
-		memcpy(&ram[paddr], &data, 4 * sizeof(u8));
+		memcpy(&ram[paddr], &data, sizeof(u32));
 		return;
 	}
 

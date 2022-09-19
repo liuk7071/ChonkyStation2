@@ -2,6 +2,8 @@
 
 GS::GS() {
 	vram.create(2048, 2048, GL_RGB8);
+	fb.createWithTexture(vram);
+	fb.bind(OpenGL::FramebufferTypes::DrawAndReadFramebuffer);
 }
 
 void GS::WriteInternalRegister(int reg, u64 data) {
@@ -9,8 +11,8 @@ void GS::WriteInternalRegister(int reg, u64 data) {
 	switch (reg) {
 	case 0x50: {	// BITBLTBUF
 		bitbltbuf.raw = data;
-		Helpers::Debug(Helpers::Log::GSd, "Source format:      %d\n", bitbltbuf.src_format);
-		Helpers::Debug(Helpers::Log::GSd, "Destination format: %d\n", bitbltbuf.dst_format);
+		Helpers::Debug(Helpers::Log::GSd, "Source format:      %d\n", bitbltbuf.src_format.Value());
+		Helpers::Debug(Helpers::Log::GSd, "Destination format: %d\n", bitbltbuf.dst_format.Value());
 		break;
 	}
 	case 0x51: {	// TRXPOS
@@ -27,6 +29,12 @@ void GS::WriteInternalRegister(int reg, u64 data) {
 		Helpers::Debug(Helpers::Log::GSd, "Height: %d\n", trxreg.height.Value());
 		break;
 	}
+	case 0x53: {	// TRXDIR
+		trxdir.raw = data;
+		if (trxdir.dir == 2) ProcessCopy(); // TODO: Is this when the VRAM->VRAM transfers should happen...?
+		Helpers::Debug(Helpers::Log::GSd, "Direction:  %d\n", trxdir.dir.Value());
+		break;
+	}
 	}
 }
 
@@ -36,9 +44,15 @@ void GS::PushHWREG(u64 data) {
 }
 
 // Upload data transferred via GIF to vram
-void GS::ProcessTransfer() {
+void GS::ProcessUpload() {
 	Helpers::Debug(Helpers::Log::GSd, "Uploading texture\n");
 	vram.bind();
 	glTexSubImage2D(GL_TEXTURE_2D, 0, trxpos.dst_x, trxpos.dst_y, trxreg.width, trxreg.height, GL_RGBA, GL_UNSIGNED_BYTE, transfer_buffer.data());
 	transfer_buffer.clear();
+}
+
+// VRAM->VRAM transfers
+void GS::ProcessCopy() {
+	Helpers::Debug(Helpers::Log::GSd, "Copying texture\n");
+	glBlitFramebuffer(trxpos.src_x, trxpos.src_y, trxpos.src_x + trxreg.width, trxpos.src_y + trxreg.height, trxpos.dst_x, trxpos.dst_y, trxpos.dst_x + trxreg.width, trxpos.dst_y + trxreg.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 }

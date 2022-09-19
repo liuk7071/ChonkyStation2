@@ -76,10 +76,22 @@ void EE::Execute(Instruction instr) {
 			Helpers::Debug(Helpers::Log::EEd, "divu %s %s\n", gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
 			break;
 		}
+		case ADD: {	// TODO: Overflow
+			u32 result = gprs[instr.rs].b32[0] + gprs[instr.rt].b32[0];
+			gprs[instr.rd].b64[0] = (u64)(s32)result;
+			Helpers::Debug(Helpers::Log::EEd, "add %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			break;
+		}
 		case ADDU: {
 			u32 result = gprs[instr.rs].b32[0] + gprs[instr.rt].b32[0];
 			gprs[instr.rd].b64[0] = (u64)(s32)result;
 			Helpers::Debug(Helpers::Log::EEd, "addu %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			break;
+		}
+		case SUB: {	// TODO: Overflow
+			u32 result = gprs[instr.rs].b32[0] - gprs[instr.rt].b32[0];
+			gprs[instr.rd].b64[0] = (u64)(s32)result;
+			Helpers::Debug(Helpers::Log::EEd, "sub %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case SUBU: {
@@ -187,6 +199,11 @@ void EE::Execute(Instruction instr) {
 		Helpers::Debug(Helpers::Log::EEd, "bgtz %s, 0x%04x\n", gpr[instr.rs.Value()], offset);
 		break;
 	}
+	case ADDI: {	// TODO: Overflow
+		gprs[instr.rt].b64[0] = (u64)(gprs[instr.rs].b64[0] + (u64)(s16)instr.imm);
+		Helpers::Debug(Helpers::Log::EEd, "addi %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
+		break;
+	}
 	case ADDIU: {
 		gprs[instr.rt].b64[0] = (u64)(gprs[instr.rs].b64[0] + (u64)(s16)instr.imm);
 		Helpers::Debug(Helpers::Log::EEd, "addiu %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
@@ -275,6 +292,13 @@ void EE::Execute(Instruction instr) {
 		Helpers::Debug(Helpers::Log::EEd, "lb %s, 0x%04x(%s) ; %s <- mem[0x%08x] (0x%02x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data);
 		break;
 	}
+	case LH: {
+		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
+		u16 data = mem->Read<u16>(address);
+		gprs[instr.rt].b64[0] = (s64)data;
+		Helpers::Debug(Helpers::Log::EEd, "lh %s, 0x%04x(%s) ; %s <- mem[0x%08x] (0x%04x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data);
+		break;
+	}
 	case LW: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
 		if (address & 3) {
@@ -294,10 +318,23 @@ void EE::Execute(Instruction instr) {
 		Helpers::Debug(Helpers::Log::EEd, "lbu %s, 0x%04x(%s) ; %s <- mem[0x%08x] (0x%02x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data);
 		break;
 	}
+	case LHU: {
+		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
+		u16 data = mem->Read<u16>(address);
+		gprs[instr.rt].b64[0] = (u64)(s8)data;
+		Helpers::Debug(Helpers::Log::EEd, "lhu %s, 0x%04x(%s) ; %s <- mem[0x%08x] (0x%04x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data);
+		break;
+	}
 	case SB: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
 		Helpers::Debug(Helpers::Log::EEd, "sb, %s, 0x%04x(%s) ; mem[0x%08x] <- 0x%02x\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), address, gprs[instr.rt.Value()].b8[0]);
 		mem->Write<u8>(address, gprs[instr.rt].b8[0]);
+		break;
+	}
+	case SH: {
+		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
+		Helpers::Debug(Helpers::Log::EEd, "sh, %s, 0x%04x(%s) ; mem[0x%08x] <- 0x%04x\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), address, gprs[instr.rt.Value()].b8[0]);
+		mem->Write<u16>(address, gprs[instr.rt].b16[0]);
 		break;
 	}
 	case SW: {
@@ -349,6 +386,7 @@ void EE::Execute(Instruction instr) {
 void EE::Syscall(u64 v1) {
 	switch (v1) {
 	case 0x02: SetGsCrt(gprs[4].b64[0], gprs[5].b64[0], gprs[6].b64[0]); break;
+	case 0x64: Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) FlushCache [IGNORED]\n"); break;
 	case 0x71: GsPutIMR(gprs[4].b64[0]); break;
 	default: Helpers::Panic("Unhandled SYSCALL $v1 = %xh\n", gprs[3].b64[0]);
 	}

@@ -94,9 +94,15 @@ public:
 		BitField<0, 12, u64> width;
 		BitField<32, 12, u64> height;
 	} trxreg;
+	union {
+		u64 raw;
+		BitField<0, 2, u64> dir;
+	} trxdir;
 
 	OpenGL::Texture vram;
+	OpenGL::Framebuffer fb;
 	std::vector<u32> transfer_buffer;
 	void PushHWREG(u64 data);
-	void ProcessTransfer();
+	void ProcessUpload();
+	void ProcessCopy();
 };
