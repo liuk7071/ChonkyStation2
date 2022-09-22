@@ -68,6 +68,7 @@ public:
 	u64 smode2;
 	u64 dispfb2;
 	u64 display2;
+	u64 bgcolor;
 	u64 csr;
 	u64 imr;
 
@@ -103,6 +104,7 @@ public:
 	OpenGL::Framebuffer fb;
 	std::vector<u32> transfer_buffer;
 	void PushHWREG(u64 data);
+	void PushXYZ(u128 data);
 	void ProcessUpload();
 	void ProcessCopy();
 };

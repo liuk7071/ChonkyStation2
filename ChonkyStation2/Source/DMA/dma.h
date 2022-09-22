@@ -23,6 +23,11 @@ public:
 
 	bool MaybeStart();
 	void DoDMA(u8* source, void (*dma_handler_ptr)(u128, void*), void* device);
+	std::pair<bool, u64> ParseDMATag(u128 tag);
+	void SourceTagID();
+	int tag_id = 0;
+	u32 dmatag_addr = 0;
+	bool tag_end = false;
 	
 	enum DMAModes {
 		Normal,

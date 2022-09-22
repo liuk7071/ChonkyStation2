@@ -43,6 +43,11 @@ void GS::PushHWREG(u64 data) {
 	transfer_buffer.push_back(data >> 32);
 }
 
+void GS::PushXYZ(u128 data) {
+	// TODO
+	Helpers::Debug(Helpers::Log::GSd, "Queued vertex\n");
+}
+
 // Upload data transferred via GIF to vram
 void GS::ProcessUpload() {
 	Helpers::Debug(Helpers::Log::GSd, "Uploading texture\n");

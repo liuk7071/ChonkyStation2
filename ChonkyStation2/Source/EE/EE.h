@@ -47,6 +47,7 @@ public:
 		COP0    = 0x10,
 		BEQL    = 0x14,
 		BNEL    = 0x15,
+		SQ      = 0x1f,
 		LB      = 0x20,
 		LH      = 0x21,
 		LW      = 0x23,
@@ -68,6 +69,7 @@ public:
 		MOVN    = 0x0b,
 		SYSCALL = 0x0c,
 		SYNC    = 0x0f,
+		MFHI    = 0x10,
 		MFLO    = 0x12,
 		MULT    = 0x18,
 		DIVU    = 0x1b,
@@ -81,9 +83,12 @@ public:
 		SLTU    = 0x2b,
 		DADDU   = 0x2d,
 		DSLL    = 0x38,
-		DSRL    = 0x3a
+		DSRL    = 0x3a,
+		DSLL32  = 0x3c,
+		DSRL32  = 0x3e
 	};
 	enum REGIMM {
+		BLTZ = 0x00,
 		BGEZ = 0x01
 	};
 	enum COP0 {
@@ -92,11 +97,14 @@ public:
 		TLB  = 0x10
 	};
 	enum TLB {
-		TLBWI = 0x02
+		TLBWI = 0x02,
+		EI    = 0x38
 	};
 
 	// HLE SYSCALLs
 	void Syscall(u64 v1);
 	void SetGsCrt(bool interlaced, int display_mode, bool frame);
 	void GsPutIMR(u64 value);
+	void InitMainThread(u32 gp, u32 stack, int stack_size, u32 args, int root);
+	void InitHeap(u32 heap, int heap_size);
 };

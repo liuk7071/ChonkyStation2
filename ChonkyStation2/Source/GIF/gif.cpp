@@ -2,6 +2,18 @@
 
 void GIF::PackedTransfer(u128 qword) {
 	switch (regs[current_reg]) {
+	case 0x0: {
+		gs->WriteInternalRegister(0, qword.b64[0] & 0x7ff);
+		break;
+	}
+	case 0x1: {
+		gs->WriteInternalRegister(1, qword.b64[0]);
+		break;
+	}
+	case 0x4: {
+		gs->PushXYZ(qword);
+		break;
+	}
 	case 0xE: {
 		auto reg = qword.b64[1] & 0x7f;
 		gs->WriteInternalRegister(reg, qword.b64[0]);
@@ -67,7 +79,8 @@ void GIF::ParseGIFTag(u128 tag) {
 	  64-127  Register field, 4 bits each
 	*/
 
-	Helpers::Debug(Helpers::Log::GIFd, "Got tag\n");
+	Helpers::Debug(Helpers::Log::GIFd, "Got GIFtag\n");
+	Helpers::Debug(Helpers::Log::GIFd, "0x%016llx%016llx\n", tag.b64[1], tag.b64[0]);
 	nloop = tag.b64[0] & 0x7fff;
 	has_tag = nloop;
 	if (!has_tag) {
@@ -88,5 +101,10 @@ void GIF::ParseGIFTag(u128 tag) {
 	for (int i = 0; i < nregs; i++) {
 		regs[i] = (tag.b64[1] >> (i * 4)) & 0xf;
 		Helpers::Debug(Helpers::Log::GIFd, "Got reg 0x%x\n", regs[i]);
+	}
+
+	if ((tag.b64[0] >> 46) & 1) {
+		Helpers::Debug(Helpers::Log::GSd, "PRIM bit enabled, sending data\n");
+		gs->WriteInternalRegister(0, (tag.b64[0] >> 47) & 0x7ff);
 	}
 }

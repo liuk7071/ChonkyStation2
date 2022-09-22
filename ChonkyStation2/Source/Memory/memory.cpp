@@ -163,7 +163,7 @@ void Memory::Write(u32 vaddr, u32 data) {
 		dma->GIF.CHCR.raw = data;
 		Helpers::Debug(Helpers::Log::DMAd, "(GIF) CHCR <- 0x%08x\n", data);
 		if (dma->GIF.MaybeStart()) {
-			dma->GIF.DoDMA(&ram[dma->GIF.MADR], &gif->SendQWord, gif);
+			dma->GIF.DoDMA(ram, &gif->SendQWord, gif);
 		}
 		return;
 	}
@@ -245,6 +245,11 @@ template<>
 void Memory::Write(u32 vaddr, u64 data) {
 	// This is temporary, need to handle all the virtual address stuff
 	u32 paddr = vaddr & 0x1FFFFFFF;
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
+		memcpy(&ram[paddr], &data, sizeof(u64));
+		return;
+	}
+
 	if (paddr == 0x12000000) {
 		Helpers::Debug(Helpers::Log::GSd, "PMODE <- 0x%08x\n", data);
 		gs->pmode = data;
@@ -263,6 +268,11 @@ void Memory::Write(u32 vaddr, u64 data) {
 	if (paddr == 0x120000a0) {
 		Helpers::Debug(Helpers::Log::GSd, "DISPLAY2 <- 0x%08x\n", data);
 		gs->display2 = data;
+		return;
+	}
+	if (paddr == 0x120000e0) {
+		Helpers::Debug(Helpers::Log::GSd, "BGCOLOR <- 0x%08x\n", data);
+		gs->bgcolor = data;
 		return;
 	}
 	if (paddr == 0x12001000) {
