@@ -16,6 +16,7 @@ void DMAGeneric::DoDMA(u8* source, void (*dma_handler_ptr)(u128, void*), void* d
 				qw.b64[1] = ((transfer_start[i + 8]) << 0) | ((transfer_start[i + 9]) << 8) | ((transfer_start[i + 10]) << 16) | ((transfer_start[i + 11]) << 24) | ((u64)(transfer_start[i + 12]) << 32) | ((u64)(transfer_start[i + 13]) << 40) | ((u64)(transfer_start[i + 14]) << 48) | ((u64)(transfer_start[i + 15]) << 56);
 				//printf("[DMAC] Transferring QWORD: 0x%016llx%016llx\n", qw.b64[1], qw.b64[0]);
 				(*dma_handler_ptr)(qw, device);
+				MADR += 16;
 			}
 			break;
 		}
@@ -42,8 +43,9 @@ void DMAGeneric::DoDMA(u8* source, void (*dma_handler_ptr)(u128, void*), void* d
 					u128 qw;
 					qw.b64[0] = ((transfer_start[i + 0]) << 0) | ((transfer_start[i + 1]) << 8) | ((transfer_start[i + 2]) << 16) | ((transfer_start[i + 3]) << 24) | ((u64)(transfer_start[i + 4]) << 32) | ((u64)(transfer_start[i + 5]) << 40) | ((u64)(transfer_start[i + 6]) << 48) | ((u64)(transfer_start[i + 7]) << 56);
 					qw.b64[1] = ((transfer_start[i + 8]) << 0) | ((transfer_start[i + 9]) << 8) | ((transfer_start[i + 10]) << 16) | ((transfer_start[i + 11]) << 24) | ((u64)(transfer_start[i + 12]) << 32) | ((u64)(transfer_start[i + 13]) << 40) | ((u64)(transfer_start[i + 14]) << 48) | ((u64)(transfer_start[i + 15]) << 56);
-					//printf("[DMAC] Transferring QWORD: 0x%016llx%016llx\n", qw.b64[1], qw.b64[0]);
+					printf("[DMAC] Transferring QWORD: 0x%016llx%016llx\n", qw.b64[1], qw.b64[0]);
 					(*dma_handler_ptr)(qw, device);
+					MADR += 16;
 				}
 			}
 			break;
@@ -81,7 +83,7 @@ std::pair<bool, u64> DMAGeneric::ParseDMATag(u128 tag) {
 	The effects of the tag ID vary depending on if the channel is in source chain or dest chain mode.
 	*/
 	auto ret = std::make_pair<bool, u64>(false, 0);
-	Helpers::Debug(Helpers::Log::DMAd, "Got DMAtag\n");
+	Helpers::Debug(Helpers::Log::DMAd, "Got DMAtag (TADR: 0x%08x)\n", TADR);
 	QWC = tag.b64[0] & 0xffff;
 	// TODO: Priority control
 	tag_id = (tag.b64[0] >> 28) & 7;
@@ -94,7 +96,7 @@ std::pair<bool, u64> DMAGeneric::ParseDMATag(u128 tag) {
 		ret.first = true;
 		ret.second = tag.b64[1];
 	}
-	dmatag_addr = (tag.b64[0] >> 32) & 0x7fffffff;
+	dmatag_addr = (tag.b64[0] >> 32) & 0xfffffff0;
 	if ((tag.b64[0] >> 63) & 1) Helpers::Panic("DMAtag unimplemented scratchpad ADDR\n");
 	Helpers::Debug(Helpers::Log::DMAd, "QWC: %d\n", QWC);
 	Helpers::Debug(Helpers::Log::DMAd, "tag id: %d\n", tag_id);

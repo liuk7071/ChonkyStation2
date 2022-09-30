@@ -5,6 +5,9 @@
 
 class GS {
 public:
+	using uvec4 = OpenGL::uvec4;
+	using vec4 = OpenGL::vec4;
+
 	GS();
 	std::map<int, std::string> internal_registers {
 		{0x00,		"PRIM"},
@@ -65,7 +68,12 @@ public:
 	void WriteInternalRegister(int reg, u64 data);
 
 	u64 pmode;
+	u64 smode1;
 	u64 smode2;
+	u64 srfsh;
+	u64 synch1;
+	u64 synch2;
+	u64 syncv;
 	u64 dispfb2;
 	u64 display2;
 	u64 bgcolor;
@@ -102,9 +110,40 @@ public:
 
 	OpenGL::Texture vram;
 	OpenGL::Framebuffer fb;
+
+	OpenGL::VertexArray vao;
+	OpenGL::VertexBuffer vbo;
+	OpenGL::Shader vertex_shader;
+	OpenGL::Shader fragment_shader;
+	OpenGL::Program shader_program;
+
+	const char* vertex_shader_source = R"(
+	#version 330 core
+	layout(location = 0) in uvec3 pos;
+	
+	out vec4 colour;
+	
+	void main() {
+		gl_Position = vec4((pos.xy / 16u) / 2048.f - 1.f, 0.f, 1.f);
+		colour = vec4(1.f, 1.f, 1.f, 1.f);
+	}
+	)";
+
+	const char* fragment_shader_source = R"(
+	#version 330 core
+	in vec4 colour;
+	
+	out vec4 colour_final;
+	
+	void main() {
+		colour_final = colour;
+	}
+	)";
+
 	std::vector<u32> transfer_buffer;
 	void PushHWREG(u64 data);
-	void PushXYZ(u128 data);
+	std::vector<uvec4> vertex_queue;
+	void PushXYZ(uvec4 data);
 	void ProcessUpload();
 	void ProcessCopy();
 };

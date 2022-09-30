@@ -4,6 +4,29 @@ GS::GS() {
 	vram.create(2048, 2048, GL_RGB8);
 	fb.createWithTexture(vram);
 	fb.bind(OpenGL::FramebufferTypes::DrawAndReadFramebuffer);
+	OpenGL::setViewport(640, 480);
+
+	vbo.create();
+	vbo.bind();
+
+	vao.create();
+	vao.bind();
+	/*
+		VAO format (TODO: I will probably add more attributes)
+		
+		x, y, z = int
+		Vtx1	x	y	z
+		Vtx2	x	y	z		stride: 3*sizeof(int)
+		Vtx3	x	y	z
+	*/
+	vao.setAttributeInt<GLuint>(0, 3, 3 * sizeof(GLuint), (void*)0);
+	vao.enableAttribute(0);
+
+	if(!vertex_shader.create(vertex_shader_source, OpenGL::ShaderType::Vertex)) Helpers::Panic("Failed to compile vertex shader\n");
+	if(!fragment_shader.create(fragment_shader_source, OpenGL::ShaderType::Fragment)) Helpers::Panic("Failed to compile fragment shader\n");
+	if(!shader_program.create({ vertex_shader, fragment_shader })) Helpers::Panic("Failed to link shader\n");
+
+	shader_program.use();
 }
 
 void GS::WriteInternalRegister(int reg, u64 data) {
@@ -43,9 +66,35 @@ void GS::PushHWREG(u64 data) {
 	transfer_buffer.push_back(data >> 32);
 }
 
-void GS::PushXYZ(u128 data) {
-	// TODO
-	Helpers::Debug(Helpers::Log::GSd, "Queued vertex\n");
+void GS::PushXYZ(uvec4 data) {
+	Helpers::Debug(Helpers::Log::GSd, "Queued vertex:\n");
+	Helpers::Debug(Helpers::Log::GSd, "x: %d\n", data.x());
+	Helpers::Debug(Helpers::Log::GSd, "y: %d\n", data.y());
+	Helpers::Debug(Helpers::Log::GSd, "z: %d\n", data.z());
+	vertex_queue.push_back(data);
+
+	// Drawing kick
+	if (vertex_queue.size() == 3) {	// TODO: Currently only works with triangles (3 vertices)
+		Helpers::Debug(Helpers::Log::GSd, "(DRAWING KICK)\n");
+		unsigned int attribs[] = {
+			vertex_queue[0].x(), vertex_queue[0].y(), vertex_queue[0].z(),
+			vertex_queue[1].x(), vertex_queue[1].y(), vertex_queue[1].z(),
+			vertex_queue[2].x(), vertex_queue[2].y(), vertex_queue[2].z(),
+		};
+		/*unsigned int attribs[] = {
+			31680, 32752, 0,
+			31664, 31752, 0,
+			31680, 31752, 0
+		};*/
+		//unsigned int attribs[] = {
+		//	20000, 10000, 0,
+		//	10000, 30000, 0,
+		//	30000, 30000, 0
+		//};
+		glBufferData(GL_ARRAY_BUFFER, sizeof(attribs), attribs, GL_STATIC_DRAW);
+		OpenGL::draw(OpenGL::Primitives::Triangle, 3);
+		vertex_queue.clear();
+	}
 }
 
 // Upload data transferred via GIF to vram

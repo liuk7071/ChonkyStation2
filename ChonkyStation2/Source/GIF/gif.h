@@ -4,6 +4,9 @@
 
 class GIF {
 public:
+	using uvec4 = OpenGL::uvec4;
+	using vec4 = OpenGL::vec4;
+
 	GS* gs;
 	GIF(GS* gsptr) : gs(gsptr) {};
 
@@ -27,4 +30,7 @@ public:
 
 	void PackedTransfer(u128 qword);
 	void ImageTransfer(u128 qword);
+
+	u32 ctrl = 0;
+	u32 stat = 0;
 };

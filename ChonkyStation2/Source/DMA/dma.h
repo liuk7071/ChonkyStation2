@@ -44,7 +44,16 @@ public:
 class DMA {
 public:
 	// Channels
+	DMAGeneric VIF0;
+	DMAGeneric VIF1;
 	DMAGeneric GIF;
+	DMAGeneric IPU_FROM;
+	DMAGeneric IPU_TO;
+	DMAGeneric SIF0;
+	DMAGeneric SIF1;
+	DMAGeneric SIF2;
+	DMAGeneric SPR_FROM;
+	DMAGeneric SPR_TO;
 	// Registers
 	u32 CTRL;
 	u32 STAT;

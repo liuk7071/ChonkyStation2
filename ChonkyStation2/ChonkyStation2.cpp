@@ -20,17 +20,20 @@ int main() {
     }
 
     Ps2 ps2;
-    ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\3stars\\3stars\\3stars.elf");
+    //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\3stars\\3stars\\3stars.elf");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02a\\demo2a.elf");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02b\\demo2b.elf");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_01\\demo1.elf");
-    //ps2.memory.LoadBIOS("C:\\Users\\zacse\\Downloads\\ps2_bios\\scph10000.bin");
+    //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\OSDSYS");
+    ps2.memory.LoadBIOS("C:\\Users\\zacse\\Downloads\\ps2_bios\\scph10000.bin");
 
     bool quit = false;
     int cycle_count = 0;
     u8* out = new u8[2048 * 2048 * 4];
     while (!quit) {
         if (cycle_count > 100000) { // Temporarily just a random number
+            ps2.gs.csr |= (1 << 3); // VSINT
+
             SDL_Event e;
 
             while (SDL_PollEvent(&e)) {

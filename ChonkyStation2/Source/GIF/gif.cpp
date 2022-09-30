@@ -11,7 +11,12 @@ void GIF::PackedTransfer(u128 qword) {
 		break;
 	}
 	case 0x4: {
-		gs->PushXYZ(qword);
+		uvec4 vertex;
+		vertex.x() = ((qword.b64[0] >> 0) & 0xffff);
+		vertex.y() = ((qword.b64[0] >> 32) & 0xffff);
+		vertex.z() = ((qword.b64[1] >> 4) & 0xffffff);
+		// F
+		gs->PushXYZ(vertex);
 		break;
 	}
 	case 0xE: {
