@@ -118,6 +118,16 @@ void DMAGeneric::SourceTagID() {
 		TADR = MADR + (QWC * 16);
 		break;
 	}
+	case 2: {	// next
+		MADR = TADR + 16;
+		TADR = dmatag_addr;
+		break;
+	}
+	case 7: {	// end
+		MADR = TADR + 16;
+		tag_end = true;
+		break;
+	}
 	default:
 		Helpers::Panic("Unimplemented source tag id value: %d\n", tag_id);
 	}

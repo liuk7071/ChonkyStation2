@@ -8,7 +8,8 @@
 #include <optional>
 #include <string>
 #include "../Third party/Dolphin/BitField.hpp"
-// Macros / typedefs
+#include "../Third party/opengl.h"
+// Macros / typedefs / structs
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -22,6 +23,14 @@ union u128 {
 	u32 b32[4];
 	u16 b16[8];
 	u8  b8[16];
+};
+
+using uvec4 = OpenGL::uvec4;
+using vec4 = OpenGL::vec4;
+
+struct Vertex {
+	uvec4 coords;
+	uvec4 col;
 };
 
 #define UNITS
@@ -43,7 +52,7 @@ namespace Helpers {
 
 // What should we log?
 #define LOG_ELF
-//#define LOG_EE
+#define LOG_EE
 #define LOG_MEM
 #define LOG_DMA
 #define LOG_GIF

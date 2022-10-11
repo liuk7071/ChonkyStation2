@@ -44,12 +44,16 @@ u16 Memory::Read(u32 vaddr) {
 		memcpy(&data, &scratchpad[vaddr - 0x70000000], 4 * sizeof(u16));
 		return data;
 	}
-	Helpers::Panic("Unhandled read16 from 0x%08x\n", vaddr);
+
+	if (paddr == 0x1f803800) return 0; // TODO: Don't know what this is
+
+	Helpers::Panic("Unhandled read16 from 0x%08x (0x%08x)\n", paddr, vaddr);
 }
 template<>
 u32 Memory::Read(u32 vaddr) {
 	// This is temporary, need to handle all the virtual address stuff
 	u32 paddr = vaddr & 0x1FFFFFFF;
+
 	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 32 MB) {
 		u32 data;
 		memcpy(&data, &ram[paddr], 4 * sizeof(u8));
@@ -66,10 +70,22 @@ u32 Memory::Read(u32 vaddr) {
 		return data;
 	}
 
+	// IPU (stubbed)
+	if (paddr == 0x10002010) {
+		printf("IPU Control read\n");
+		return 0;
+	}
+
 	// GIF
 	if (paddr == 0x10003020) {
 		Helpers::Debug(Helpers::Log::GIFd, "Read STAT\n");
 		return gif->stat;
+	}
+
+	// TIMERS (stubbed)
+	if (paddr >= 0x10000000 && (paddr <= (0x10000030 + 0x800 * 4))) {
+		printf("Read TIMER registers\n");
+		return 0;
 	}
 
 	// GS
@@ -105,6 +121,16 @@ u32 Memory::Read(u32 vaddr) {
 		return intc_mask;
 	}
 
+	// SIF
+	if (paddr == 0x1000f210) {
+		printf("SIF_SMCOM read @ 0x%08x\n", *pc);
+		return 0;
+	}
+	if (paddr == 0x1000f230) {
+		return 0x0102223c;	// Gran Turismo 4 expects this
+		//return rand() % 0xffffffff; // TODO
+	}
+
 	if (paddr == 0x1000f430) {
 		return 0;
 	}
@@ -131,6 +157,14 @@ u32 Memory::Read(u32 vaddr) {
 		}
 		return 0;
 	}
+
+	if (paddr == 0x1000f520) return 0;
+
+	if (paddr == 0x1000c000) return 0; // TODO: Don't know what this is
+	if (paddr == 0x1000c400) return 0; // TODO: Don't know what this is
+	if (paddr == 0x1000c430) return 0; // TODO: Don't know what this is
+
+	if (paddr == 0x10008000) return 0; // TODO: Don't know what this is
 
 	if (paddr == 0x1c0003c0) return 0; // TODO: Don't know what this is
 	if (paddr == 0x1f80141c) return 0; // TODO: Don't know what this is
@@ -184,10 +218,14 @@ void Memory::Write(u32 vaddr, u8 data) {
 	}
 
 	if (paddr == 0x1000f180) {
+		print_cnt++;
 		printf("%c", data);
 		return;
 	}
-	Helpers::Panic("Unhandled write8 to 0x%08x\n", vaddr);
+
+	std::ofstream out("ram.bin", std::iostream::binary);
+	out.write((const char*)ram, 32 MB);
+	Helpers::Panic("Unhandled write8 to 0x%08x @ 0x%08x\n", paddr, *pc);
 }
 template<>
 void Memory::Write(u32 vaddr, u16 data) {
@@ -235,6 +273,8 @@ void Memory::Write(u32 vaddr, u32 data) {
 		return;
 	}
 
+	// IPU
+
 	// GIF
 	if (paddr == 0x10003000) {
 		Helpers::Debug(Helpers::Log::GIFd, "CTRL <- 0x%08x\n", data);
@@ -247,7 +287,7 @@ void Memory::Write(u32 vaddr, u32 data) {
 		dma->VIF0.CHCR.raw = data;
 		Helpers::Debug(Helpers::Log::DMAd, "(VIF0) CHCR <- 0x%08x\n", data);
 		if (dma->VIF0.MaybeStart()) {
-			Helpers::Panic("Attempted to start VIF0 DMA\n");
+			printf("Attempted to start VIF0 DMA\n");
 		}
 		return;
 	}
@@ -403,7 +443,7 @@ void Memory::Write(u32 vaddr, u32 data) {
 		dma->SIF0.CHCR.raw = data;
 		Helpers::Debug(Helpers::Log::DMAd, "(SIF0) CHCR <- 0x%08x\n", data);
 		if (dma->SIF0.MaybeStart()) {
-			Helpers::Panic("Attempted to start SIF0 DMA\n");
+			printf("Attempted to start SIF0 DMA\n");
 		}
 		return;
 	}
@@ -442,7 +482,9 @@ void Memory::Write(u32 vaddr, u32 data) {
 		dma->SIF1.CHCR.raw = data;
 		Helpers::Debug(Helpers::Log::DMAd, "(SIF1) CHCR <- 0x%08x\n", data);
 		if (dma->SIF1.MaybeStart()) {
-			Helpers::Panic("Attempted to start SIF1 DMA\n");
+			printf("Attempted to start SIF1 DMA @ 0x%08x\n", *pc);
+			// DMAC INT1 stub
+			//int1 = true;
 		}
 		return;
 	}
@@ -599,6 +641,7 @@ void Memory::Write(u32 vaddr, u32 data) {
 		Helpers::Debug(Helpers::Log::DMAd, "(GIF) CHCR <- 0x%08x\n", data);
 		if (dma->GIF.MaybeStart()) {
 			dma->GIF.DoDMA(ram, &gif->SendQWord, gif);
+			//int1 = true;
 		}
 		return;
 	}
@@ -703,7 +746,8 @@ void Memory::Write(u32 vaddr, u32 data) {
 		return;
 	}
 	if (paddr == 0x1000f010) {
-		intc_mask = data;
+		printf("INTC_MASK: 0x%x\n", intc_mask ^ data);
+		intc_mask ^= data;
 		return;
 	}
 
@@ -721,6 +765,8 @@ void Memory::Write(u32 vaddr, u32 data) {
 		mch_drd = data;
 		return;
 	}
+
+	if (paddr == 0x1000f590) return;
 
 	if (paddr == 0x1f80141c) return; // TODO: Don't know what this is
 	if (paddr == 0x1000f100) return; // TODO: Don't know what this is
@@ -765,6 +811,12 @@ void Memory::Write(u32 vaddr, u64 data) {
 
 	if (paddr >= 0x1100C000 && paddr <= 0x1100C000 + 16 KB) {
 		memcpy(&vu1_data_mem[paddr - 0x1100C000], &data, sizeof(u64));
+		return;
+	}
+
+	// IPU
+	if (paddr >= 0x10007010 && (paddr <= 0x10007019)) {
+		printf("IPU In fifo write\n");
 		return;
 	}
 
@@ -867,7 +919,6 @@ u32 Memory::LoadELF(const char* FilePath) {
 	fread(&e_entry, sizeof(uint8_t), 4, elf);
 	Helpers::Debug(Helpers::Log::ELFd, "Loading ELF -> 0x%08x\n", e_entry);
 	// Load the program into RAM
-	// TODO: Multiple program headers?
 	u32 e_phoff = 0;
 	u32 e_shoff = 0;
 	u32 e_phentsize = 0;
@@ -893,18 +944,20 @@ u32 Memory::LoadELF(const char* FilePath) {
 	u32 p_vaddr = 0;
 	u32 p_filesz = 0;
 	u32 p_memsz = 0;
-	fseek(elf, e_phoff + 0x04, SEEK_SET);
-	fread(&p_offset, sizeof(u8), 4, elf);
-	fread(&p_vaddr, sizeof(u8), 4, elf);
-	fseek(elf, e_phoff + 0x10, SEEK_SET);
-	fread(&p_filesz, sizeof(u8), 4, elf);
-	fread(&p_memsz, sizeof(u8), 4, elf);
-	Helpers::Debug(Helpers::Log::ELFd, "(p_offset = 0x%08x)\n", p_offset);
-	Helpers::Debug(Helpers::Log::ELFd, "(p_vaddr  = 0x%08x)\n", p_vaddr);
-	Helpers::Debug(Helpers::Log::ELFd, "(p_filesz = 0x%08x)\n", p_filesz);
-	Helpers::Debug(Helpers::Log::ELFd, "(p_memsz  = 0x%08x)\n", p_memsz);
-	fseek(elf, p_offset, SEEK_SET);
-	fread(ram + p_vaddr, sizeof(u8), p_filesz, elf);
+	for (int i = 0; i < e_phnum; i++) {
+		fseek(elf, (e_phentsize * i) + e_phoff + 0x04, SEEK_SET);
+		fread(&p_offset, sizeof(u8), 4, elf);
+		fread(&p_vaddr, sizeof(u8), 4, elf);
+		fseek(elf, (e_phentsize * i) + e_phoff + 0x10, SEEK_SET);
+		fread(&p_filesz, sizeof(u8), 4, elf);
+		fread(&p_memsz, sizeof(u8), 4, elf);
+		Helpers::Debug(Helpers::Log::ELFd, "(p_offset = 0x%08x)\n", p_offset);
+		Helpers::Debug(Helpers::Log::ELFd, "(p_vaddr  = 0x%08x)\n", p_vaddr);
+		Helpers::Debug(Helpers::Log::ELFd, "(p_filesz = 0x%08x)\n", p_filesz);
+		Helpers::Debug(Helpers::Log::ELFd, "(p_memsz  = 0x%08x)\n", p_memsz);
+		fseek(elf, p_offset, SEEK_SET);
+		fread(ram + p_vaddr, sizeof(u8), p_filesz, elf);
+	}
 
 	Helpers::Debug(Helpers::Log::ELFd, "\n\n--- EXECUTING ---\n");
 	return e_entry;

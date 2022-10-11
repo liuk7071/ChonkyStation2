@@ -24,6 +24,9 @@ public:
 	u16 intc_stat;
 	u16 intc_mask;
 
+	int print_cnt = 0; // Used to know when to load an ELF, probably wont work with all bioses, but I don't care
+	bool int1 = false; // Temporary stub for int1
+
 	u32 mch_ricm;
 	u32 mch_drd;
 	int rdram_sdevid;

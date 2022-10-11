@@ -1,12 +1,9 @@
 #pragma once
 #include "../common.h"
-#include "../../Third party/opengl.h"
 #include <map>
 
 class GS {
 public:
-	using uvec4 = OpenGL::uvec4;
-	using vec4 = OpenGL::vec4;
 
 	GS();
 	std::map<int, std::string> internal_registers {
@@ -80,7 +77,14 @@ public:
 	u64 csr;
 	u64 imr;
 
-
+	union {
+		u64 raw;
+		BitField<0, 8, u64> r;
+		BitField<8, 8, u64> g;
+		BitField<16, 8, u64> b;
+		BitField<24, 8, u64> a;
+		BitField<32, 32, u64> q;
+	} rgbaq;
 	union {
 		u64 raw;
 		BitField<0, 14, u64> src_base_ptr;
@@ -120,30 +124,32 @@ public:
 	const char* vertex_shader_source = R"(
 	#version 330 core
 	layout(location = 0) in uvec3 pos;
+	layout(location = 1) in uvec4 col;
 	
-	out vec4 colour;
+	out vec4 vertex_col;
 	
 	void main() {
 		gl_Position = vec4((pos.xy / 16u) / 2048.f - 1.f, 0.f, 1.f);
-		colour = vec4(1.f, 1.f, 1.f, 1.f);
+		vertex_col = vec4(float(col.r) / 255.f, float(col.g) / 255.f, float(col.b) / 255.f, 1.f);
 	}
 	)";
 
 	const char* fragment_shader_source = R"(
 	#version 330 core
-	in vec4 colour;
+	in vec4 vertex_col;
 	
 	out vec4 colour_final;
 	
 	void main() {
-		colour_final = colour;
+		colour_final = vertex_col;
 	}
 	)";
 
 	std::vector<u32> transfer_buffer;
+	int transfer_pixels_left = 0;
 	void PushHWREG(u64 data);
-	std::vector<uvec4> vertex_queue;
-	void PushXYZ(uvec4 data);
+	std::vector<Vertex> vertex_queue;
+	void PushXYZ(Vertex vertex);
 	void ProcessUpload();
 	void ProcessCopy();
 };
