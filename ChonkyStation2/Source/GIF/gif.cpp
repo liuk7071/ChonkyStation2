@@ -43,12 +43,12 @@ void GIF::ImageTransfer(u128 qword) {
 	current_nloop--;
 }
 
-void GIF::SendQWord(u128 qword, void* gifptr) {
+u32 GIF::SendQWord(u128 qword, void* gifptr) {
 	GIF* gif = (GIF*)gifptr;
 	if ((gif->data_format == DataFormat::PACKED) && (gif->current_reg == gif->nregs)) gif->has_tag = false;
 	if (!gif->has_tag) {
 		gif->ParseGIFTag(qword);
-		return;
+		return 0;
 	}
 	else {
 		switch (gif->data_format) {
@@ -62,6 +62,8 @@ void GIF::SendQWord(u128 qword, void* gifptr) {
 			Helpers::Panic("Unimplemented GIF data format %d\n", gif->data_format);
 		}
 	}
+
+	return 0;
 }
 
 void GIF::ParseGIFTag(u128 tag) {

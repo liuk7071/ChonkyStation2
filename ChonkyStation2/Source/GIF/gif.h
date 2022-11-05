@@ -12,7 +12,7 @@ public:
 
 	u128 giftag;
 	bool has_tag = false;
-	static void SendQWord(u128 qword, void* gifptr);
+	static u32 SendQWord(u128 qword, void* gifptr);
 	void ParseGIFTag(u128 tag);
 
 	enum DataFormat {

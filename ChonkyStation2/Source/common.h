@@ -39,7 +39,7 @@ struct Vertex {
 
 // Helper functions
 namespace Helpers {
-	static const char* Logstr[] = { "[ELF] ", "[EE] ", "[MEM] ", "[DMA] ", "[GIF] ", "[GS] ", "" };
+	static const char* Logstr[] = { "[ELF] ", "[EE] ", "[MEM] ", "[DMA] ", "[GIF] ", "[GS] ", "[SIF] ", "" };
 	enum class Log {
 		ELFd,
 		EEd,
@@ -47,6 +47,7 @@ namespace Helpers {
 		DMAd,
 		GIFd,
 		GSd,
+		SIFd,
 		NOCOND
 	};
 
@@ -57,6 +58,7 @@ namespace Helpers {
 #define LOG_DMA
 #define LOG_GIF
 #define LOG_GS
+#define LOG_SIF
 	static bool ShouldLog(Log log) {
 		if (log == Log::ELFd) {
 #ifdef LOG_ELF
@@ -95,6 +97,13 @@ namespace Helpers {
 		}
 		if (log == Log::GSd) {
 #ifdef LOG_GS
+			return true;
+#else
+			return false;
+#endif
+		}
+		if (log == Log::SIFd) {
+#ifdef LOG_SIF
 			return true;
 #else
 			return false;

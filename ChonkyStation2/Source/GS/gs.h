@@ -77,6 +77,7 @@ public:
 	u64 csr;
 	u64 imr;
 
+	u64 prim;
 	union {
 		u64 raw;
 		BitField<0, 8, u64> r;

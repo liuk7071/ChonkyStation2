@@ -106,7 +106,7 @@ u32 Memory::Read(u32 vaddr) {
 		return dma->CTRL;
 	}
 	if (paddr == 0x1000e010) {
-		Helpers::Debug(Helpers::Log::DMAd, "Read STAT\n");
+		Helpers::Debug(Helpers::Log::DMAd, "Read STAT (0x%x)\n", dma->STAT);
 		return dma->STAT;
 	}
 	if (paddr == 0x1000e020) {
@@ -122,12 +122,22 @@ u32 Memory::Read(u32 vaddr) {
 	}
 
 	// SIF
+	if (paddr == 0x1000f200) {
+		printf("sif->MSCOM read @ 0x%08x\n", *pc);
+		return sif->mscom;
+	}
 	if (paddr == 0x1000f210) {
-		printf("SIF_SMCOM read @ 0x%08x\n", *pc);
-		return 0;
+		printf("sif->SMCOM read @ 0x%08x\n", *pc);
+		return sif->smcom;
+	}
+	if (paddr == 0x1000f220) {
+		Helpers::Debug(Helpers::Log::SIFd, "sif->MSFLG read @ 0x%08x\n", *pc);
+		return sif->msflg;
 	}
 	if (paddr == 0x1000f230) {
-		return 0x0102223c;	// Gran Turismo 4 expects this
+		//printf("sif->SMFLG read @ 0x%08x\n", *pc);
+		return sif->smflg;
+		//return 0x0102223c;	// Gran Turismo 4 expects this?
 		//return rand() % 0xffffffff; // TODO
 	}
 
@@ -201,6 +211,8 @@ u64 Memory::Read(u32 vaddr) {
 		return data;
 	}
 
+	if (vaddr >= 0xfffffd20 && (vaddr <= 0xffffffff)) return 0;
+
 	Helpers::Panic("Unhandled read64 from 0x%08x\n", vaddr);
 }
 
@@ -254,6 +266,10 @@ void Memory::Write(u32 vaddr, u32 data) {
 		memcpy(&ram[paddr], &data, sizeof(u32));
 		return;
 	}
+	if (paddr >= 0x1c000000 && paddr <= 0x1c000000 + 2 MB) {
+		memcpy(&iop_ram[paddr - 0x1c000000], &data, sizeof(u32));
+		return;
+	}
 	if (vaddr >= 0x70000000 && vaddr <= 0x70000000 + 16 KB) {
 		memcpy(&scratchpad[vaddr - 0x70000000], &data, sizeof(u32));
 		return;
@@ -270,6 +286,30 @@ void Memory::Write(u32 vaddr, u32 data) {
 		Helpers::Debug(Helpers::Log::GSd, "CSR <- 0x%08x\n", data);
 		data &= ~(1 << 3);
 		gs->csr = data;
+		return;
+	}
+
+	// SIF
+	if (paddr == 0x1000f200) {
+		Helpers::Debug(Helpers::Log::SIFd, "MSCOM <- 0x%08x\n", data);
+		sif->mscom = data;
+		return;
+	}
+	if (paddr == 0x1000f220) {
+		Helpers::Debug(Helpers::Log::SIFd, "sif->MSFLG <- 0x%08x\n", data);
+		sif->msflg = data;
+		return;
+	}
+	if (paddr == 0x1000f230) {
+		Helpers::Debug(Helpers::Log::SIFd, "sif->SMFLG <- 0x%08x\n", data);
+		sif->smflg = data;
+		return;
+	}
+	if (paddr == 0x1000f240) {
+		Helpers::Debug(Helpers::Log::SIFd, "(stubbed) CTRL <- 0x%08x\n", data);
+		return;
+	}
+	if (paddr == 0x1000f260) { // "Nothing is known about this register, other than that it does get accessed during initialization."
 		return;
 	}
 
@@ -443,7 +483,13 @@ void Memory::Write(u32 vaddr, u32 data) {
 		dma->SIF0.CHCR.raw = data;
 		Helpers::Debug(Helpers::Log::DMAd, "(SIF0) CHCR <- 0x%08x\n", data);
 		if (dma->SIF0.MaybeStart()) {
-			printf("Attempted to start SIF0 DMA\n");
+			if (!sif->sif0_empty) {
+				printf("Should start EE SIF0 DMA\n");
+			}
+			else {
+				printf("Should start EE SIF0 DMA but SIF0 fifo is empty, queuing transfer\n");
+				sif->ee_sif0_queued = true;
+			}
 		}
 		return;
 	}
@@ -482,9 +528,22 @@ void Memory::Write(u32 vaddr, u32 data) {
 		dma->SIF1.CHCR.raw = data;
 		Helpers::Debug(Helpers::Log::DMAd, "(SIF1) CHCR <- 0x%08x\n", data);
 		if (dma->SIF1.MaybeStart()) {
-			printf("Attempted to start SIF1 DMA @ 0x%08x\n", *pc);
+			dma->SIF1.CHCR.DIR = 1;
+			dma->SIF1.DoDMA(ram, &sif->SendSIF1, sif);
 			// DMAC INT1 stub
 			//int1 = true;
+			if (sif->iop_sif1_queued && !sif->sif1_empty) {
+				iopdma->SIF1.DoDMA(iop_ram, sif->ReadSIF1, sif);
+				sif->iop_sif1_queued = false;
+				// IOP IRQ3
+				// TODO (kinda important): This is not entirely correct
+				iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 3);
+				iopdma->DICR |= (1 << 31);
+				if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
+					printf("[INTC] (IOP) Requesting IRQ3\n");
+					iop_i_stat |= 1 << 3;
+				}
+			}
 		}
 		return;
 	}
@@ -683,10 +742,10 @@ void Memory::Write(u32 vaddr, u32 data) {
 	}
 	if (paddr == 0x1000e010) {
 		u16 stat, mask;
-		stat = dma->STAT & 0xffff;
-		mask = (dma->STAT >> 16) & 0xffff;
-		stat &= ~(data & 0xffff);
-		mask ^= (data >> 16) & 0xffff;
+		stat = dma->STAT & 0x3ff;
+		mask = (dma->STAT >> 16) & 0x3ff;
+		stat &= ~(data & 0x3ff);
+		mask ^= (data >> 16) & 0x3ff;
 		dma->STAT = stat | (mask << 16);
 		Helpers::Debug(Helpers::Log::DMAd, "STAT <- 0x%08x\n", data);
 		return;
@@ -765,6 +824,8 @@ void Memory::Write(u32 vaddr, u32 data) {
 		mch_drd = data;
 		return;
 	}
+
+	if (vaddr >= 0xfffffd80 && (vaddr <= (0xfffffd90 + 0x1e8))) return;
 
 	if (paddr == 0x1000f590) return;
 
@@ -893,6 +954,8 @@ void Memory::Write(u32 vaddr, u64 data) {
 		return;
 	}
 
+	if (vaddr >= 0xfffffd80 && (vaddr <= (0xfffffd90 + 0x1e8))) return;
+
 	if (paddr == 0x10004000) return; // TODO: Don't know what this is
 	if (paddr == 0x10004008) return; // TODO: Don't know what this is
 	if (paddr == 0x10005000) return; // TODO: Don't know what this is
@@ -961,4 +1024,413 @@ u32 Memory::LoadELF(const char* FilePath) {
 
 	Helpers::Debug(Helpers::Log::ELFd, "\n\n--- EXECUTING ---\n");
 	return e_entry;
+}
+
+// -------- IOP --------
+
+template<>
+u8 Memory::IOPRead(u32 vaddr) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 2 MB) {
+		return iop_ram[paddr];
+	}
+
+	if (paddr >= 0x1fc00000 && paddr <= 0x20000000) {
+		return bios[paddr - 0x1fc00000];
+	}
+
+	Helpers::Panic("Unhandled IOP read8 from 0x%08x (vaddr: 0x%08x)\n", paddr, vaddr);
+}
+
+template<>
+u16 Memory::IOPRead(u32 vaddr) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 2 MB) {
+		u16 data;
+		memcpy(&data, &iop_ram[paddr], 2 * sizeof(u8));
+		return data;
+	}
+
+	if (paddr >= 0x1fc00000 && paddr <= 0x20000000) {
+		u16 data;
+		memcpy(&data, &bios[paddr - 0x1fc00000], 2 * sizeof(u8));
+		return data;
+	}
+
+	// SPU
+	if (paddr >= 0x1f900000 && (paddr <= (0x1f900400 + 2 KB))) {
+		printf("(IOP) Ignored SPU2 register read\n");
+		return 0;
+	}
+
+	// Timers
+	if (paddr >= 0x1f80110 && (paddr <= 0x1f8014af)) {
+		printf("(IOP) IGNORED TIMER READ16\n");
+		return 0;
+	}
+
+	Helpers::Panic("Unhandled IOP read16 from 0x%08x (vaddr: 0x%08x)\n", paddr, vaddr);
+}
+
+template<>
+u32 Memory::IOPRead(u32 vaddr) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 2 MB) {
+		u32 data;
+		memcpy(&data, &iop_ram[paddr], 4 * sizeof(u8));
+		return data;
+	}
+
+	if (paddr >= 0x1fc00000 && paddr <= 0x20000000) {
+		u32 data;
+		memcpy(&data, &bios[paddr - 0x1fc00000], 4 * sizeof(u8));
+		return data;
+	}
+
+	if (paddr == 0x1f801070) {
+		printf("(IOP) I_STAT read\n");
+		return iop_i_stat;
+	}
+	if (paddr == 0x1f801074) {
+		printf("(IOP) I_MASK read\n");
+		return iop_i_mask;
+	}
+	if (paddr == 0x1f801078) {
+		//printf("(IOP) I_CTRL read\n");
+		return 0;
+	}
+
+	// Timers
+	if (paddr == 0x1f8014a0) {
+		return tmr_stub; tmr_stub += 4;
+	}
+
+	// SIF
+	if (paddr == 0x1d000010) {
+		printf("(IOP) sif->SMCOM read\n");
+		return sif->smcom;
+	}
+	if (paddr == 0x1d000020) {
+		//printf("(IOP) sif->MSFLG read\n");
+		return sif->msflg;
+	}
+	if (paddr == 0x1d000030) {
+		//printf("(IOP) sif->SMFLG read\n");
+		return sif->smflg;
+	}
+	if (paddr == 0x1d000040) return 0; // sif->CTRL
+	if (paddr == 0x1d000060) return 0; // sif->BD6
+
+	// CDVD
+	if (paddr == 0x1f402005) {
+		printf("(IOP) CDVD N command status read\n");
+		return rand() % 0xffffffff;
+	}
+
+	// DMA
+	if (paddr == 0x1f801528) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF0) Read CHCR\n");
+		return iopdma->SIF0.CHCR.raw;
+	}
+
+	if (paddr == 0x1f8010f0) {
+		printf("(IOP) Read DPCR\n");
+		return 0;
+	}
+	if (paddr == 0x1f8010f4) {
+		printf("(IOP) Read DICR\n");
+		return iopdma->DICR;
+	}
+	if (paddr == 0x1f801570) {
+		printf("(IOP) Read DPCR2\n");
+		return 0;
+	}
+	if (paddr == 0x1f801574) {
+		printf("(IOP) Read DICR2\n");
+		return iopdma->DICR2.raw;
+	}
+	if (paddr == 0x1f801578) {
+		//printf("(IOP) Read DMACEN\n");
+		return dmacen;
+	}
+
+	if (paddr == 0x1f801010) return 0; // BIOS ROM Delay/Size
+	if (paddr == 0x1f80100c) return 0; // Expansion 3 Delay/Size
+
+	if (paddr >= 0x1e000000 && (paddr <= 0x1effffff)) return 0; // TODO: Don't know what this is
+	if (paddr == 0x1f801414) return 0; // TODO: Don't know what this is
+	if (paddr == 0x1f801400) return 0; // TODO: Don't know what this is
+	if (paddr == 0x1f801450) return 0; // TODO: Don't know what this is
+
+	Helpers::Panic("Unhandled IOP read32 from 0x%08x (vaddr: 0x%08x)\n", paddr, vaddr);
+}
+
+template<>
+void Memory::IOPWrite(u32 vaddr, u8 data) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 2 MB) {
+		iop_ram[vaddr] = data;
+		return;
+	}
+
+	if (paddr == 0x1f802070) return; // POST2 - Unknown
+
+	Helpers::Panic("Unhandled IOP write8 to 0x%08x (vaddr: 0x%08x) @ 0x%08x\n", paddr, vaddr, *pc);
+}
+
+template<>
+void Memory::IOPWrite(u32 vaddr, u16 data) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 2 MB) {
+		memcpy(&iop_ram[paddr], &data, sizeof(u16));
+		return;
+	}
+
+	// SPU
+	if (paddr >= 0x1f900000 && (paddr <= (0x1f900400 + 2 KB))) {
+		printf("(IOP) Ignored SPU2 register write\n");
+		return;
+	}
+
+	// DMA
+	if (paddr == 0x1f801524) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF0) BCR <- 0x%x\n", data);
+		iopdma->SIF0.BCR = data;
+		return;
+	}
+
+	if (paddr == 0x1f801534) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF1) BCR <- 0x%x\n", data);
+		iopdma->SIF1.BCR = data;
+		return;
+	}
+
+	if (paddr >= 0x1f801500 && (paddr <= 0x1f80150c)) {
+		printf("(IOP) IGNORED SPU DMA WRITE 0x%x\n", paddr);
+		return;
+	}
+	if (paddr >= 0x1f8010c0 && (paddr <= 0x1f8010cc)) {
+		printf("(IOP) IGNORED SPU DMA WRITE 0x%x\n", paddr);
+		return;
+	}
+
+	// Timers
+	if (paddr == 0x1f8014a4) return;
+
+	Helpers::Panic("Unhandled IOP write16 to 0x%08x (vaddr: 0x%08x) @ 0x%08x\n", paddr, vaddr, *pc);
+}
+
+template<>
+void Memory::IOPWrite(u32 vaddr, u32 data) {
+	// This is temporary, need to handle all the virtual address stuff
+	u32 paddr = vaddr & 0x1FFFFFFF;
+	if (paddr >= 0x00000000 && paddr <= 0x00000000 + 2 MB) {
+		memcpy(&iop_ram[paddr], &data, sizeof(u32));
+		return;
+	}
+
+	if (paddr == 0x1f801070) {
+		printf("(IOP) I_STAT <- 0x%x\n", data);
+		iop_i_stat &= data;
+		return;
+	}
+	if (paddr == 0x1f801074) {
+		printf("(IOP) I_MASK <- 0x%x\n", data);
+		iop_i_mask = data;
+		return;
+	}
+	if (paddr == 0x1f801078) {
+		//printf("(IOP) I_CTRL <- 0x%x\n", data);
+		return;
+	}
+
+	// SIF
+	if (paddr == 0x1d000010) {
+		Helpers::Debug(Helpers::Log::SIFd, "(IOP) sif->SMCOM <- 0x%x\n", data);
+		sif->smcom = data;
+		return;
+	}
+	if (paddr == 0x1d000020) {
+		Helpers::Debug(Helpers::Log::SIFd, "(IOP) sif->MSFLG <- 0x%x\n", data);
+		sif->msflg = data;
+		return;
+	}
+	if (paddr == 0x1d000030) {
+		Helpers::Debug(Helpers::Log::SIFd, "(IOP) sif->SMFLG <- 0x%x\n", data);
+		sif->smflg = data;
+		return;
+	}
+	if (paddr == 0x1d000040) return;
+
+	// DMAC
+	if (paddr == 0x1f801520) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF0) MADR <- 0x%x\n", data);
+		iopdma->SIF0.MADR = data;
+		return;
+	}
+	if (paddr == 0x1f801524) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF0) BCR <- 0x%x\n", data);
+		iopdma->SIF0.BCR = data;
+		return;
+	}
+	if (paddr == 0x1f801528) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF0) CHCR <- 0x%x\n", data);
+		iopdma->SIF0.CHCR.raw = data;
+		if (iopdma->SIF0.MaybeStart()) {
+			iopdma->SIF0.DoDMA(iop_ram, sif->SendSIF0, sif);
+			
+			if (sif->ee_sif0_queued && !sif->sif0_empty) {
+				dma->SIF0.DoDMA(ram, sif->ReadSIF0, sif);
+				dma->STAT |= 1 << 5;
+				if((dma->STAT & 0x3ff) & ((dma->STAT >> 16) & 0x3ff))
+					int1 = true;
+				sif->ee_sif0_queued = false;
+			}
+			// IOP IRQ3
+			// TODO (kinda important): This is not entirely correct
+			iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 2);
+			iopdma->DICR |= (1 << 31);
+			if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
+				printf("[INTC] (IOP) Requesting IRQ3\n");
+				iop_i_stat |= 1 << 3;
+			}
+		}
+		return;
+	}
+	if (paddr == 0x1f80152c) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF0) TADR <- 0x%x\n", data);
+		iopdma->SIF0.TADR = data;
+		return;
+	}
+
+	if (paddr == 0x1f801530) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF1) MADR <- 0x%x\n", data);
+		iopdma->SIF1.MADR = data;
+		return;
+	}
+	if (paddr == 0x1f801534) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF1) BCR <- 0x%x\n", data);
+		iopdma->SIF1.BCR = data;
+		return;
+	}
+	if (paddr == 0x1f801538) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF1) CHCR <- 0x%x\n", data);
+		iopdma->SIF1.CHCR.raw = data;
+		if (iopdma->SIF1.MaybeStart()) {
+			if (!sif->sif1_empty) {
+				iopdma->SIF1.DoDMA(iop_ram, sif->ReadSIF1, sif);
+				sif->iop_sif1_queued = false;
+				// IOP IRQ3
+				// TODO (kinda important): This is not entirely correct
+				iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 3);
+				iopdma->DICR |= (1 << 31);
+				if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
+					printf("[INTC] (IOP) Requesting IRQ3\n");
+					iop_i_stat |= 1 << 3;
+				}
+			}
+			else {
+				printf("Should start IOP SIF1 DMA but SIF1 fifo is empty, queuing transfer\n");
+				sif->iop_sif1_queued = true;
+			}
+			return;
+		}
+		return;
+	}
+	if (paddr == 0x1f80153c) {
+		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF1) TADR <- 0x%x\n", data);
+		iopdma->SIF1.TADR = data;
+		return;
+	}
+
+	if (paddr == 0x1f8010f0) {
+		printf("(IOP) DPCR <- 0x%x\n", data);
+		return;
+	}
+	if (paddr == 0x1f801570) {
+		printf("(IOP) DPCR2 <- 0x%x\n", data);
+		return;
+	}
+	if (paddr == 0x1f801578) {
+		//printf("(IOP) DMACEN <- 0x%x\n", data);
+		dmacen = data;
+		return;
+	}
+	if (paddr == 0x1f8010f4) {
+		printf("(IOP) DICR <- 0x%x\n", data);
+		u32 old = iopdma->DICR;
+		iopdma->DICR = data & ~0x7f000000;
+		iopdma->DICR |= ((old & 0x7f000000) & ~(data & 0x7f000000));
+		return;
+	}
+	if (paddr == 0x1f801574) {
+		printf("(IOP) DICR2 <- 0x%x\n", data);
+		u32 old = iopdma->DICR2.raw;
+		iopdma->DICR2.raw = data & ~0x3f000000;
+		iopdma->DICR2.raw |= ((old & 0x3f000000) & ~(data & 0x3f000000));
+		return;
+	}
+
+	// Timers
+	if (paddr == 0x1f8014a0) return;
+	if (paddr == 0x1f8014a8) return;
+
+	// SIO2
+	if (paddr == 0x1f808268) {
+		printf("(IOP) SIO2_CTRL <- 0x%08x\n", data);
+		return;
+	}
+
+	if (paddr == 0x1f801004) return; // Expansion 2 Base Address
+	if (paddr == 0x1f80100c) return; // Expansion 3 Delay/Size
+	if (paddr == 0x1f801010) return; // BIOS ROM Delay/Size
+	if (paddr == 0x1f801014) return; // SPU Delay/Size
+	if (paddr == 0x1f801018) return; // CDROM Delay/Size
+	if (paddr == 0x1f80101c) return; // Expansion 2 Delay/Size
+	if (paddr == 0x1f801020) return; // COM_DELAY / COMMON_DELAY
+	if (paddr == 0x1f801060) return; // RAM_SIZE
+	if (paddr == 0x1f802070) return; // POST2 - Unknown
+
+	if (paddr >= 0x1f801080 && (paddr <= 0x1f8010ec)) {
+		printf("(IOP) IGNORED DMA WRITE 0x%x\n", paddr);
+		return;
+	}
+	if (paddr >= 0x1f801500 && (paddr <= 0x1f80151c)) {
+		printf("(IOP) IGNORED DMA WRITE 0x%x\n", paddr);
+		return;
+	}
+	if (paddr >= 0x1f801540 && (paddr <= 0x1f80155c)) {
+		printf("(IOP) IGNORED DMA WRITE 0x%x\n", paddr);
+		return;
+	}
+
+	if (paddr == 0x1f801560) return;
+	if (paddr == 0x1f801564) return;
+	if (paddr == 0x1f801568) return;
+
+	if (paddr == 0x1f801400) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801404) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801408) return; // TODO: Don't know what this is
+	if (paddr == 0x1f80140c) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801404) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801410) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801414) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801418) return; // TODO: Don't know what this is
+	if (paddr == 0x1f80141c) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801420) return; // TODO: Don't know what this is
+	if (paddr == 0x1f801450) return; // TODO: Don't know what this is
+	if (paddr == 0x1f8015f0) return; // TODO: Don't know what this is
+	if (vaddr == 0xfffe0130) return; // TODO: Don't know what this is
+	if (vaddr == 0xfffe0140) return; // TODO: Don't know what this is
+	if (vaddr == 0xfffe0144) return; // TODO: Don't know what this is
+
+	Helpers::Panic("Unhandled IOP write32 to 0x%08x (vaddr: 0x%08x) @ 0x%08x\n", paddr, vaddr, *pc);
 }

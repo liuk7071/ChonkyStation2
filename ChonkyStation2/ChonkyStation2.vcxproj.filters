@@ -42,6 +42,12 @@
     <ClCompile Include="Third party\gl3w\gl3w.cpp">
       <Filter>Source\Third Party</Filter>
     </ClCompile>
+    <ClCompile Include="Source\IOP\iop.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SIF\sif.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Memory\memory.h">
@@ -112,6 +118,12 @@
     </ClInclude>
     <ClInclude Include="Third party\opengl.h">
       <Filter>Headers\Third Party</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\IOP\iop.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\SIF\sif.h">
+      <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

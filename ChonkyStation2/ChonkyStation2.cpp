@@ -25,6 +25,7 @@ int main() {
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02b\\demo2b.elf");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_01\\demo1.elf");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\OSDSYS");
+    //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\SCUS_973.28");
     ps2.memory.LoadBIOS("C:\\Users\\zacse\\Downloads\\ps2_bios\\scph10000.bin");
 
     bool quit = false;
@@ -54,9 +55,28 @@ int main() {
 
             //SDL_GL_SwapWindow(window);
             cycle_count = 0;
+            //printf("0x%08x\n", ps2.ee.pc);
+            //std::ofstream file("ram.bin", std::ios::binary);
+            //file.write((const char*)ps2.memory.ram, 32 MB);
         }
 
         ps2.ee.Step();
+        ps2.ee.Step();
+        ps2.ee.Step();
+        ps2.ee.Step();
+        ps2.ee.Step();
+        ps2.ee.Step();
+        ps2.ee.Step();
+        ps2.ee.Step();
+        ps2.iop.step();
+        if (ps2.dma.SIF0.sif0_running) {
+            for (int i = 0; i < 100000; i++) ps2.iop.step();
+            ps2.dma.SIF0.DoDMA(ps2.memory.ram, ps2.sif.ReadSIF0, &ps2.sif);
+        }
+        if (ps2.iopdma.SIF1.sif_running) {
+            for (int i = 0; i < 100000; i++) ps2.ee.Step();
+            ps2.iopdma.SIF1.DoDMA(ps2.memory.iop_ram, ps2.sif.ReadSIF1, &ps2.sif);
+        }
         cycle_count += 2;
     }
 }

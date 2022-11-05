@@ -66,13 +66,19 @@ void EE::Execute(Instruction instr) {
 			break;
 		}
 		case SLLV: {
-			const int shift = gprs[instr.rs].b64[0] & 0x3f;
+			const int shift = gprs[instr.rs].b64[0] & 0x1f;
 			gprs[instr.rd].b64[0] = (u64)(s32)(gprs[instr.rt].b32[0] << shift);
 			trace(Helpers::Log::EEd, "sllv %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
+		case SRLV: {
+			const int shift = gprs[instr.rs].b64[0] & 0x1f;
+			gprs[instr.rd].b64[0] = (u64)(s32)(gprs[instr.rt].b32[0] >> shift);
+			trace(Helpers::Log::EEd, "srlv %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+			break;
+		}
 		case SRAV: {
-			const int shift = gprs[instr.rs].b64[0] & 0x3f;
+			const int shift = gprs[instr.rs].b64[0] & 0x1f;
 			gprs[instr.rd].b64[0] = (u64)(s32)((s32)gprs[instr.rt].b32[0] >> shift);
 			trace(Helpers::Log::EEd, "srav %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
@@ -133,13 +139,13 @@ void EE::Execute(Instruction instr) {
 			break;
 		}
 		case DSLLV: {
-			const int shift = gprs[instr.rs].b64[0] & 0x3f;
+			const int shift = gprs[instr.rs].b64[0] & 0x1f;
 			gprs[instr.rd].b64[0] = gprs[instr.rt].b64[0] << shift;
 			trace(Helpers::Log::EEd, "dsllv %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case DSRAV: {
-			const int shift = gprs[instr.rs].b64[0] & 0x3f;
+			const int shift = gprs[instr.rs].b64[0] & 0x1f;
 			gprs[instr.rd].b64[0] = (s64)gprs[instr.rt].b64[0] >> shift;
 			trace(Helpers::Log::EEd, "dsrav %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
@@ -187,13 +193,13 @@ void EE::Execute(Instruction instr) {
 			break;
 		}
 		case SUB: {	// TODO: Overflow
-			u64 result = gprs[instr.rs].b64[0] - gprs[instr.rt].b64[0];
+			u64 result = gprs[instr.rs].b32[0] - gprs[instr.rt].b32[0];
 			gprs[instr.rd].b64[0] = (u64)(s32)result;
 			trace(Helpers::Log::EEd, "sub %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case SUBU: {
-			u64 result = gprs[instr.rs].b64[0] - gprs[instr.rt].b64[0];
+			u64 result = gprs[instr.rs].b32[0] - gprs[instr.rt].b32[0];
 			gprs[instr.rd].b64[0] = (u64)(s32)result;
 			trace(Helpers::Log::EEd, "subu %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
@@ -384,13 +390,13 @@ void EE::Execute(Instruction instr) {
 		break;
 	}
 	case ADDI: {	// TODO: Overflow
-		gprs[instr.rt].b64[0] = (s32)(gprs[instr.rs].b64[0] + (u64)(s16)instr.imm);
+		gprs[instr.rt].b64[0] = (s32)(gprs[instr.rs].b32[0] + (s16)instr.imm);
 		trace(Helpers::Log::EEd, "addi %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
 		break;
 	}
 	case ADDIU: {
-		gprs[instr.rt].b64[0] = (s32)(gprs[instr.rs].b64[0] + (u64)(s16)instr.imm);
-		trace(Helpers::Log::EEd, "addiu %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
+		trace(Helpers::Log::EEd, "addiu %s, %s, 0x%04x ; 0x%x + 0x%x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value(), gprs[instr.rs].b32[0], (s16)instr.imm);
+		gprs[instr.rt].b64[0] = (s32)(gprs[instr.rs].b32[0] + (s16)instr.imm);
 		break;
 	}
 	case SLTI: {
@@ -438,7 +444,7 @@ void EE::Execute(Instruction instr) {
 		case TLB: {
 			switch (instr.raw & 0x3f) {
 			case TLBWI: {
-				trace(Helpers::Log::EEd, "tlbwi\n");
+				printf("tlbwi!\n");
 				break;
 			}
 			case ERET: {
@@ -454,12 +460,14 @@ void EE::Execute(Instruction instr) {
 				return;
 			}
 			case EI: {
-				// TODO: Don't have interrupts
+				if (((cop0r[12].b64[0] >> 17) & 1) || ((cop0r[12].b64[0] >> 1) & 1) || ((cop0r[12].b64[0] >> 2) & 1) || (((cop0r[12].b64[0] >> 3) & 3) == 0))
+					cop0r[12].b64[0] |= 1 << 16;
 				trace(Helpers::Log::EEd, "ei\n");
 				break;
 			}
 			case DI: {
-				// TODO: Don't have interrupts
+				if (((cop0r[12].b64[0] >> 17) & 1) || ((cop0r[12].b64[0] >> 1) & 1) || ((cop0r[12].b64[0] >> 2) & 1) || (((cop0r[12].b64[0] >> 3) & 3) == 0))
+					cop0r[12].b64[0] &= ~(1 << 16);
 				trace(Helpers::Log::EEd, "di\n");
 				break;
 			}
@@ -521,20 +529,20 @@ void EE::Execute(Instruction instr) {
 	}
 	case LDL: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
-		const int shift = (address & 7) * 8;
+		const int shift = ((address & 7) ^ 7) * 8;
 		u64 data_temp = mem->Read<u64>(address & ~7);
-		u64 rt_temp = gprs[instr.rt].b64[0] & ~(0xffffffffffffffff << shift);
-		data_temp <<= shift;
+		u64 rt_temp = gprs[instr.rt].b64[0] & ~(0xffffffffffffffff >> shift);
+		data_temp >>= shift;
 		gprs[instr.rt].b64[0] = data_temp | rt_temp;
 		trace(Helpers::Log::EEd, "ldl %s, 0x%04x(%s) ; %s merge mem[0x%08x] (0x%016x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data_temp | rt_temp);
 		break;
 	}
 	case LDR: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
-		const int shift = ((address & 7) ^ 7) * 8;
+		const int shift = (address & 7) * 8;
 		u64 data_temp = mem->Read<u64>(address & ~7);
-		u64 rt_temp = gprs[instr.rt].b64[0] & ~(0xffffffffffffffff >> shift);
-		data_temp >>= shift;
+		u64 rt_temp = gprs[instr.rt].b64[0] & ~(0xffffffffffffffff << shift);
+		data_temp <<= shift;
 		gprs[instr.rt].b64[0] = data_temp | rt_temp;
 		trace(Helpers::Log::EEd, "ldr %s, 0x%04x(%s) ; %s merge mem[0x%08x] (0x%016x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data_temp | rt_temp);
 		break;
@@ -638,7 +646,7 @@ void EE::Execute(Instruction instr) {
 				gprs[instr.rd].b32[1] = gprs[instr.rs].b32[1] + gprs[instr.rt].b32[1];
 				gprs[instr.rd].b32[2] = gprs[instr.rs].b32[2] + gprs[instr.rt].b32[2];
 				gprs[instr.rd].b32[3] = gprs[instr.rs].b32[3] + gprs[instr.rt].b32[3];
-				trace(Helpers::Log::EEd, "padduw %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				trace(Helpers::Log::EEd, "padduw %s, %s, %s\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
 				break;
 			}
 			case PCEQB: {
@@ -779,20 +787,20 @@ void EE::Execute(Instruction instr) {
 	}
 	case SDL: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
-		const int shift = (address & 7) * 8;
+		const int shift = ((address & 7) ^ 7) * 8;
 		u64 data_temp = mem->Read<u64>(address & ~7);
-		u64 rt_temp = gprs[instr.rt].b64[0] >> shift;
-		data_temp &= ~(0xffffffffffffffff >> shift);
+		u64 rt_temp = gprs[instr.rt].b64[0] << shift;
+		data_temp &= ~(0xffffffffffffffff << shift);
 		mem->Write<u64>(address & ~7, data_temp | rt_temp);
 		trace(Helpers::Log::EEd, "sdl %s, 0x%04x(%s) ; mem[0x%08x] merge %s (0x%016x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), address, gpr[instr.rt.Value()].c_str(), data_temp | rt_temp);
 		break;
 	}
 	case SDR: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
-		const int shift = ((address & 7) ^ 7) * 8;
+		const int shift = (address & 7) * 8;
 		u64 data_temp = mem->Read<u64>(address & ~7);
-		u64 rt_temp = gprs[instr.rt].b64[0] << shift;
-		data_temp &= ~(0xffffffffffffffff << shift);
+		u64 rt_temp = gprs[instr.rt].b64[0] >> shift;
+		data_temp &= ~(0xffffffffffffffff >> shift);
 		mem->Write<u64>(address & ~7, data_temp | rt_temp);
 		trace(Helpers::Log::EEd, "sdr %s, 0x%04x(%s) ; mem[0x%08x] merge %s (0x%016x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), address, gpr[instr.rt.Value()].c_str(), data_temp | rt_temp);
 		break;
@@ -841,6 +849,23 @@ void EE::Execute(Instruction instr) {
 
 // HLE SYSCALLs
 void EE::Syscall(u64 v1) {
+	/*if (v1 == 0x83) {
+		printf("Ignored syscall 0x83\n");
+		traceb = true;
+		return;
+	}*/
+	for (auto& i : custom_syscalls) {
+		if (i.index == v1) {
+			Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) Custom Syscall 0x%x\n", i.index);
+			//gprs[29].b64[0] -= 0x10;
+			ra_old = gprs[31].b64[0];
+			pc_old = pc;
+			gprs[31].b64[0] = 0x1fc00000;
+			pc = (i.address & 0x1fffffff) - 4;
+			return;
+		}
+	}
+
 	switch (v1) {
 	case 0x02: SetGsCrt(gprs[4].b64[0], gprs[5].b64[0], gprs[6].b64[0]); break;
 	case 0x12: Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) AddDmacHandler [IGNORED]\n"); break;
@@ -852,7 +877,7 @@ void EE::Syscall(u64 v1) {
 	case 0x44: WaitSema(gprs[4].b64[0]); break;
 	case 0x64: Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) FlushCache [IGNORED]\n"); break;
 	case 0x71: GsPutIMR(gprs[4].b64[0]); break;
-	case 0x74: Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) SetSyscall %xh [IGNORED]\n", gprs[4].b64[0]); break;
+	case 0x74: SetSyscall(gprs[4].b64[0], gprs[5].b64[0]); break;
 	case 0x77: SifSetDma(gprs[4].b64[0], gprs[5].b64[0]); break;
 	case 0x7a: break;
 	default: Helpers::Panic("Unhandled SYSCALL $v1 = %xh\n", gprs[3].b64[0]);
@@ -866,6 +891,13 @@ void EE::GsPutIMR(u64 value) {
 	mem->gs->imr = value;
 	Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) GsPutIMR(0x%016x);\n", value);
 }
+void EE::SetSyscall(int index, u32 address) {
+	Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) SetSyscall(0x%x, 0x%08x)\n", index, address);
+	CustomSyscall syscall;
+	syscall.index = index;
+	syscall.address = address;
+	custom_syscalls.push_back(syscall);
+}
 void EE::InitMainThread(u32 gp, u32 stack, int stack_size, u32 args, int root) {
 	Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) InitMainThread(0x%x, 0x%x, %d); [partially stubbed]\n", gp, stack, stack_size);
 	main_thread_stack = ((s32)stack != -1) ? (stack + stack_size) : (0x2000000 - stack_size);
@@ -877,7 +909,7 @@ void EE::InitHeap(u32 heap, int heap_size) {
 }
 void EE::CreateSema(u32 semaparam_ptr) {
 	Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) CreateSema(0x%08x); [stubbed]\n", semaparam_ptr);
-	gprs[2].b64[0] = 1;
+	gprs[2].b64[0] = ++sema_id;
 }
 void EE::DeleteSema(int sema_id) {
 	Helpers::Debug(Helpers::Log::NOCOND, "(SYSCALL) DeleteSema(%d); [stubbed]\n", sema_id);
@@ -891,12 +923,21 @@ void EE::SifSetDma(u32 transfer_ptr, int len) {
 }
 
 void EE::Step() {
-	if (mem->int1) {
-		Exception(Exceptions::Interrupt, true);
-		mem->int1 = false;
+	if (mem->int1 && ((cop0r[12].b64[0] >> 11) & 1)) {
+		if ((cop0r[12].b64[0] & 1) && ((cop0r[12].b64[0] >> 16) & 1) && !((cop0r[12].b64[0] >> 1) & 1) && !((cop0r[12].b64[0] >> 2) & 1)) {
+			Exception(Exceptions::Interrupt, true);
+			printf("[INTC] INT1 Fired\n");
+			mem->int1 = false;
+		}
 	}
 
-	// Eventually there will be more to this
+#ifdef BIOS_HLE
+	if (pc == 0x1fc00000) {
+		pc = pc_old + 4;
+		gprs[31].b64[0] = ra_old;
+	}
+#endif
+
 	cop0r[9].b64[0] += 2;
 	u32 instr = mem->Read<u32>(pc);
 	trace(Helpers::Log::EEd, "0x%08x ", pc);
@@ -908,10 +949,13 @@ void EE::Step() {
 	if (mem->print_cnt == 512) {
 		mem->print_cnt++;
 		//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\3stars\\3stars\\3stars.elf");
+		//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_01\\demo1.elf");
 		//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02a\\demo2a.elf");
+		//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02b\\demo2b.elf");
 		//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\OSDSYS");
-		pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\SCUS_973.28");
-		branch_pc = std::nullopt;
+		//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\SCUS_973.28");
+		//branch_pc = std::nullopt;
+		//traceb = true;
 	}
 
 	//if (pc == 0x8000688c) traceb = true;

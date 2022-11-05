@@ -16,7 +16,7 @@ GS::GS() {
 		
 		x, y, z, r, g, b, a = uint
 		Vtx1	x	y	z   r   g   b   a
-		Vtx2	x	y	z	r   g   b   a		stride: 7*sizeof(uint)
+		Vtx2	x	y	z   r   g   b   a		stride: 7*sizeof(uint)
 		Vtx3	x	y	z   r   g   b   a
 	*/
 	vao.setAttributeInt<GLuint>(0, 3, 7 * sizeof(GLuint), (void*)0);
@@ -34,16 +34,20 @@ GS::GS() {
 void GS::WriteInternalRegister(int reg, u64 data) {
 	Helpers::Debug(Helpers::Log::GSd, "Write 0x%llx to internal register %s\n", data, internal_registers[reg].c_str());
 	switch (reg) {
+	case 0x00: {	// PRIM
+		prim = data;
+		break;
+	}
 	case 0x01: {	// RGBAQ
 		rgbaq.raw = data;
 		break;
 	}
 	case 0x05: {	// XYZ2
-		uvec4 vertex;
-		vertex.x() = data & 0xffff;
-		vertex.y() = (data >> 16) & 0xffff;
-		vertex.z() = (data >> 32) & 0xffffffff;
-		//PushXYZ(vertex);
+		Vertex vertex;
+		vertex.coords.x() = data & 0xffff;
+		vertex.coords.y() = (data >> 16) & 0xffff;
+		vertex.coords.z() = (data >> 32) & 0xffffffff;
+		//if((prim & 7) == 0) PushXYZ(vertex);
 		break;
 	}
 	case 0x50: {	// BITBLTBUF

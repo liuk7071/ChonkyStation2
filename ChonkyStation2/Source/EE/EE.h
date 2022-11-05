@@ -90,6 +90,7 @@ public:
 		SRL     = 0x02,
 		SRA     = 0x03,
 		SLLV    = 0x04,
+		SRLV    = 0x06,
 		SRAV    = 0x07,
 		JR      = 0x08,
 		JALR    = 0x09,
@@ -180,9 +181,18 @@ public:
 	void Syscall(u64 v1);
 	void SetGsCrt(bool interlaced, int display_mode, bool frame);
 	void GsPutIMR(u64 value);
+	struct CustomSyscall {
+		int index;
+		u32 address;
+	};
+	std::vector<CustomSyscall> custom_syscalls;
+	u64 ra_old;
+	u64 pc_old;
+	void SetSyscall(int index, u32 address);
 	int main_thread_stack;
 	void InitMainThread(u32 gp, u32 stack, int stack_size, u32 args, int root);
 	void InitHeap(u32 heap, int heap_size);
+	int sema_id = 0;
 	void CreateSema(u32 semaparam_ptr);
 	void DeleteSema(int sema_id);
 	void WaitSema(int sema_id);
