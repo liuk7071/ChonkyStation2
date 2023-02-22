@@ -141,19 +141,19 @@ void EE::Execute(Instruction instr) {
 			break;
 		}
 		case DSLLV: {
-			const int shift = gprs[instr.rs].b64[0] & 0x1f;
+			const int shift = gprs[instr.rs].b64[0] & 0x3f;
 			gprs[instr.rd].b64[0] = gprs[instr.rt].b64[0] << shift;
 			trace(Helpers::Log::EEd, "dsllv %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case DSRLV: {
-			const int shift = gprs[instr.rs].b64[0] & 0x1f;
+			const int shift = gprs[instr.rs].b64[0] & 0x3f;
 			gprs[instr.rd].b64[0] = gprs[instr.rt].b64[0] >> shift;
 			trace(Helpers::Log::EEd, "dsrlv %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
 		}
 		case DSRAV: {
-			const int shift = gprs[instr.rs].b64[0] & 0x1f;
+			const int shift = gprs[instr.rs].b64[0] & 0x3f;
 			gprs[instr.rd].b64[0] = (s64)gprs[instr.rt].b64[0] >> shift;
 			trace(Helpers::Log::EEd, "dsrav %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 			break;
