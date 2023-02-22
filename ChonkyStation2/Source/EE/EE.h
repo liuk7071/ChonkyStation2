@@ -11,6 +11,7 @@ public:
 
 	void Step();
 	bool traceb = false;
+	bool sideload_elf = true;
 
 	// Registers
 	u128 gprs[32];
@@ -24,7 +25,8 @@ public:
 	// Exceptions
 	enum Exceptions {
 		Interrupt = 0x00,
-		ExSYSCALL = 0x08
+		ExSYSCALL = 0x08,
+		Trap	  = 0x0d,
 	};
 	void Exception(unsigned int exception, bool int1 = false);
 
@@ -70,15 +72,19 @@ public:
 		SQ      = 0x1f,
 		LB      = 0x20,
 		LH      = 0x21,
+		LWL     = 0x22,
 		LW      = 0x23,
 		LBU     = 0x24,
 		LHU     = 0x25,
+		LWR     = 0x26,
 		LWU     = 0x27,
 		SB      = 0x28,
 		SH      = 0x29,
+		SWL     = 0x2a,
 		SW      = 0x2b,
 		SDL     = 0x2c,
 		SDR     = 0x2d,
+		SWR     = 0x2e,
 		CACHE   = 0x2f,
 		LD      = 0x37,
 		LWC1    = 0x31,
@@ -103,8 +109,10 @@ public:
 		MFLO    = 0x12,
 		MTLO    = 0x13,
 		DSLLV   = 0x14,
+		DSRLV   = 0x16,
 		DSRAV	= 0x17,
 		MULT    = 0x18,
+		MULTU   = 0x19,
 		DIV     = 0x1a,
 		DIVU    = 0x1b,
 		ADD     = 0x20,
@@ -123,6 +131,7 @@ public:
 		DSUBU   = 0x2f,
 		MFSA    = 0x28,
 		TGE     = 0x30,
+		TEQ     = 0x34,
 		DSLL    = 0x38,
 		DSRL    = 0x3a,
 		DSLL32  = 0x3c,
@@ -130,13 +139,15 @@ public:
 		DSRA32  = 0x3f
 	};
 	enum REGIMM {
-		BLTZ  = 0x00,
-		BGEZ  = 0x01,
-		BLTZL = 0x02,
-		BGEZL = 0x03,
-		MTSAH = 0x19
+		BLTZ   = 0x00,
+		BGEZ   = 0x01,
+		BLTZL  = 0x02,
+		BGEZL  = 0x03,
+		BGEZAL = 0x11,
+		MTSAH  = 0x19
 	};
 	enum MMI {
+		MADD  = 0x00,
 		PLZCW = 0x04,
 		MMI0  = 0x08,
 		MMI2  = 0x09,
@@ -145,9 +156,14 @@ public:
 		MFLO1 = 0x12,
 		MTLO1 = 0x13,
 		MULT1 = 0x18,
+		DIV1  = 0x1a,
 		DIVU1 = 0x1b,
 		MMI1  = 0x28,
-		MMI3  = 0x29
+		MMI3  = 0x29,
+		PMFHL = 0x30
+	};
+	enum PMFHL {
+		PMFHLLW = 0,
 	};
 	enum MMI0 {
 		PADDSH = 0x17,
@@ -168,6 +184,7 @@ public:
 	enum COP0 {
 		MFC0 = 0x00,
 		MTC0 = 0x04,
+		BC0  = 0x08,
 		TLB  = 0x10
 	};
 	enum TLB {

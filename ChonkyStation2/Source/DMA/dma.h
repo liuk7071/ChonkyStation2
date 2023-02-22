@@ -76,7 +76,12 @@ class IOPDMAGeneric {
 public:
 	bool sif_running = false;
 	u32 MADR;
-	u32 BCR;
+	union bcr {
+		u32 raw;
+		BitField<0, 16, u32> SIZE;
+		BitField<16, 16, u32> COUNT;
+	};
+	bcr BCR;
 	union chcr {
 		u32 raw;
 		BitField<0, 1, u32> DIR;
@@ -98,7 +103,7 @@ public:
 
 	enum IOPDMAModes {
 		Burst,
-		Slice,
+		Sliced,
 		LinkedList,
 		Chain
 	};
@@ -116,6 +121,7 @@ public:
 		SIF1.is_sif = true;
 	}
 	// Channels
+	IOPDMAGeneric CDVD;
 	IOPDMAGeneric SIF0;
 	IOPDMAGeneric SIF1;
 	

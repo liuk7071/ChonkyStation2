@@ -26,7 +26,8 @@ int main() {
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_01\\demo1.elf");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\OSDSYS");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\SCUS_973.28");
-    ps2.memory.LoadBIOS("C:\\Users\\zacse\\Downloads\\ps2_bios\\scph10000.bin");
+    //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\cube.elf");
+    ps2.memory.LoadBIOS("C:\\Users\\zacse\\Downloads\\ps2_bios\\scph39001.bin");
 
     bool quit = false;
     int cycle_count = 0;
@@ -34,7 +35,14 @@ int main() {
     while (!quit) {
         if (cycle_count > 100000) { // Temporarily just a random number
             ps2.gs.csr |= (1 << 3); // VSINT
-
+            ps2.memory.iop_i_stat |= 1; // VBLANK START
+            ps2.memory.iop_i_stat |= 1 << 11; // VBLANK END
+            ps2.memory.intc_stat |= 1 << 12;
+            //ps2.memory.iop_i_stat |= 1 << 3;
+            //if (ps2.memory.iop_i_mask & (1 << 9)) {
+            //    ps2.memory.iop_i_stat |= 1 << 9; // SPU2
+            //    printf("Firing SPU2 INTERRUPT\n");
+            //}
             SDL_Event e;
 
             while (SDL_PollEvent(&e)) {
@@ -55,9 +63,9 @@ int main() {
 
             //SDL_GL_SwapWindow(window);
             cycle_count = 0;
-            //printf("0x%08x\n", ps2.ee.pc);
-            //std::ofstream file("ram.bin", std::ios::binary);
-            //file.write((const char*)ps2.memory.ram, 32 MB);
+            printf("0x%08x, 0x%08x\n", ps2.iop.pc, ps2.memory.iop_i_mask);
+            //std::ofstream file("ramiop.bin", std::ios::binary);
+            //file.write((const char*)ps2.memory.iop_ram, 2 MB);
         }
 
         ps2.ee.Step();

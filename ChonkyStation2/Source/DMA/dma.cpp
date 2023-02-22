@@ -206,10 +206,36 @@ void IOPDMAGeneric::DoDMA(u8* ram, u32 (*dma_handler_ptr)(u128, void*), void* de
 	auto mode = !is_sif ? CHCR.MOD.Value() : 3;
 
 	switch (mode) {
+	case IOPDMAModes::Sliced: {
+		switch (CHCR.DIR) {
+		case IOPDMADirections::ToMem: {
+			u128 unused;
+			unused.b64[0] = 0;
+			unused.b64[1] = 0;
+			u8* transfer_dest = ram + (MADR & 0xffffff);
+			Helpers::Debug(Helpers::Log::DMAd, "(IOP) Sliced DMA\n");
+			Helpers::Debug(Helpers::Log::DMAd, "(IOP) Block count: %d\n", BCR.COUNT.Value());
+			Helpers::Debug(Helpers::Log::DMAd, "(IOP) Block size : %d\n", BCR.SIZE.Value());
+			Helpers::Debug(Helpers::Log::DMAd, "(IOP) Total      : %d\n", BCR.COUNT * BCR.SIZE);
+			for (int block = 0; block < BCR.COUNT; block++) {
+				for (int i = 0; i < BCR.SIZE; i++) {
+					u32 word = (*dma_handler_ptr)(unused, device);
+					std::memcpy(transfer_dest, &word, sizeof(u32));
+					transfer_dest += 4;
+				}
+			}
+			Helpers::Debug(Helpers::Log::DMAd, "(IOP) Done.\n");
+			break;
+		}
+		default:
+			Helpers::Panic("Unimplemented IOP Sliced DMA Direction %d\n", CHCR.DIR.Value());
+		}
+		break;
+	}
 	case IOPDMAModes::Chain: {
 		switch (CHCR.DIR) {
 		case IOPDMADirections::ToMem: {
-			sif_running = true;
+			if(is_sif) sif_running = true;
 			u128 unused;
 			unused.b64[0] = 0;
 			unused.b64[1] = 0;

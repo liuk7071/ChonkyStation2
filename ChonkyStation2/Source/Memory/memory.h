@@ -4,6 +4,8 @@
 #include "../GS/gs.h"
 #include "../GIF/gif.h"
 #include "../SIF/sif.h"
+#include "../CDVD/cdvd.h"
+#include "../EE/timers.h"
 #include <fstream>
 
 class Memory {
@@ -13,7 +15,9 @@ public:
 	GIF* gif;
 	SIF* sif;
 	GS* gs;
-	Memory(DMAC* dmacptr, IOPDMA* iopdmaptr, GIF* gifptr, SIF* sifptr, GS* gsptr) : dma(dmacptr), iopdma(iopdmaptr), gif(gifptr), sif(sifptr), gs(gsptr) {};
+	CDVD* cdvd;
+	Timer t0, t1, t2, t3;
+	Memory(DMAC* dmacptr, IOPDMA* iopdmaptr, GIF* gifptr, SIF* sifptr, GS* gsptr, CDVD* cdvdptr) : dma(dmacptr), iopdma(iopdmaptr), gif(gifptr), sif(sifptr), gs(gsptr), cdvd(cdvdptr) {};
 	u32* pc;
 	// Memory regions
 	u8* ram = new u8[32 MB];
@@ -37,11 +41,23 @@ public:
 	u32 mch_drd;
 	int rdram_sdevid;
 	
+	// EE Timer stub
+	uint16_t tmr1_stub = 0;
+
 	// Memory reading/writing
 	u32 iop_i_stat;
 	u32 iop_i_mask;
 	template<typename T> T Read(u32 vaddr);
 	template<typename T> void Write(u32 vaddr, T data);
+
+	// IOP Timers -- ported from ChonkyStation
+	typedef struct IOPTimer {
+		uint16_t current_value;
+		uint16_t counter_mode;
+		uint16_t target_value;
+	};
+	IOPTimer tmr0, tmr1, tmr2;
+	int tmr1_temp, tmr2_temp;
 
 	u32 dmacen = 0;
 	template<typename T> T IOPRead(u32 vaddr);
@@ -51,4 +67,6 @@ public:
 	// ELF
 	// Loads an ELF file into memory and returns entry point
 	u32 LoadELF(const char* FilePath);
+
+	bool fastbooted = false;
 };

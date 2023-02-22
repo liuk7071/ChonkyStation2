@@ -150,8 +150,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ChonkyStation2.cpp" />
+    <ClCompile Include="Source\CDVD\cdvd.cpp" />
     <ClCompile Include="Source\DMA\dma.cpp" />
     <ClCompile Include="Source\EE\EE.cpp" />
+    <ClCompile Include="Source\EE\timers.cpp" />
     <ClCompile Include="Source\GIF\gif.cpp" />
     <ClCompile Include="Source\GS\gs.cpp" />
     <ClCompile Include="Source\IOP\iop.cpp" />
@@ -160,9 +162,11 @@
     <ClCompile Include="Third party\gl3w\gl3w.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\CDVD\cdvd.h" />
     <ClInclude Include="Source\common.h" />
     <ClInclude Include="Source\DMA\dma.h" />
     <ClInclude Include="Source\EE\EE.h" />
+    <ClInclude Include="Source\EE\timers.h" />
     <ClInclude Include="Source\GIF\gif.h" />
     <ClInclude Include="Source\GS\gs.h" />
     <ClInclude Include="Source\IOP\iop.h" />

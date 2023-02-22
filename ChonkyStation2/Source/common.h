@@ -29,8 +29,8 @@ using uvec4 = OpenGL::uvec4;
 using vec4 = OpenGL::vec4;
 
 struct Vertex {
-	uvec4 coords;
-	uvec4 col;
+	vec4 coords;
+	vec4 col;
 };
 
 #define UNITS
@@ -39,7 +39,7 @@ struct Vertex {
 
 // Helper functions
 namespace Helpers {
-	static const char* Logstr[] = { "[ELF] ", "[EE] ", "[MEM] ", "[DMA] ", "[GIF] ", "[GS] ", "[SIF] ", "" };
+	static const char* Logstr[] = { "[ELF] ", "[EE] ", "[MEM] ", "[DMA] ", "[GIF] ", "[GS] ", "[SIF] ", "[CDVD] ", "" };
 	enum class Log {
 		ELFd,
 		EEd,
@@ -48,17 +48,19 @@ namespace Helpers {
 		GIFd,
 		GSd,
 		SIFd,
+		CDVDd,
 		NOCOND
 	};
 
 // What should we log?
-#define LOG_ELF
-#define LOG_EE
-#define LOG_MEM
+//#define LOG_ELF
+//#define LOG_EE
+//#define LOG_MEM
 #define LOG_DMA
-#define LOG_GIF
+//#define LOG_GIF
 #define LOG_GS
-#define LOG_SIF
+//#define LOG_SIF
+#define LOG_CDVD
 	static bool ShouldLog(Log log) {
 		if (log == Log::ELFd) {
 #ifdef LOG_ELF
@@ -104,6 +106,13 @@ namespace Helpers {
 		}
 		if (log == Log::SIFd) {
 #ifdef LOG_SIF
+			return true;
+#else
+			return false;
+#endif
+		}
+		if (log == Log::CDVDd) {
+#ifdef LOG_CDVD
 			return true;
 #else
 			return false;

@@ -691,17 +691,63 @@ void IOP::execute(uint32_t instr) {
 }
 
 void IOP::step() {
+	if (mem->cdvd->irq) {
+		if (mem->iopdma->CDVD.MaybeStart()) {
+			mem->iopdma->CDVD.DoDMA(mem->iop_ram, mem->cdvd->ReadSectorBuffer, mem->cdvd);
+			mem->iop_i_stat |= (1 << 2);
+		}
+		//mem->cdvd->irq = false;
+	}
 	if (mem->iop_i_stat & mem->iop_i_mask) {
 		COP0.regs[13] |= (1 << 10);
 		if ((COP0.regs[12] & 1) && (COP0.regs[12] & (1 << 10))) {
-			printf("[INTC] (IOP) Interrupt fired\n");
+			//printf("[INTC] (IOP) Interrupt fired\n");
 			exception(exceptions::INT);
 		}
 	}
+
 	const auto instr = mem->IOPRead<u32>(pc);
 #ifdef log_cpu
 	debug_log("0x%.8X | 0x%.8X: ", pc, instr);
 #endif
+
+
+	auto clock_source = (mem->tmr1.counter_mode >> 8) & 3;
+	auto reset_counter = (mem->tmr1.counter_mode >> 3) & 1;
+	auto irq_when_target = (mem->tmr1.counter_mode >> 4) & 1;
+	auto sync_mode = (mem->tmr1.counter_mode >> 1) & 3;
+	mem->tmr0.current_value++;
+	if (!(mem->tmr1.counter_mode & 1) || (sync_mode != 3)) {
+		if ((clock_source == 1) || (clock_source == 3)) {
+			mem->tmr1_temp += 2;
+			if (mem->tmr1_temp > 2160) {
+				mem->tmr1.current_value++;
+				mem->tmr1_temp = 0;
+			}
+		}
+		else mem->tmr1.current_value++;
+	}
+	if (irq_when_target && (mem->tmr1.current_value >= mem->tmr1.target_value)) {
+		mem->iop_i_stat |= 0b100000;
+	}
+	if (reset_counter && (mem->tmr1.current_value >= mem->tmr1.target_value)) mem->tmr1.current_value = 0;
+
+	clock_source = (mem->tmr2.counter_mode >> 8) & 3;
+	reset_counter = (mem->tmr2.counter_mode >> 3) & 1;
+	irq_when_target = (mem->tmr2.counter_mode >> 4) & 1;
+	if (irq_when_target && (mem->tmr2.current_value >= mem->tmr2.target_value)) {
+		mem->iop_i_stat |= 0b1000000;
+	}
+	if (reset_counter && (mem->tmr2.current_value >= mem->tmr2.target_value)) mem->tmr2.current_value = 0;
+	if ((clock_source == 2) || (clock_source == 3)) {
+		mem->tmr2_temp += 2;
+		if (mem->tmr2_temp > 8) {
+			mem->tmr2.current_value++;
+			mem->tmr2_temp = 0;
+		}
+	}
+	else mem->tmr2.current_value++;
+
 
 	// From ps2tek
 	if (pc == 0x12C48 || pc == 0x1420C || pc == 0x1430C) {

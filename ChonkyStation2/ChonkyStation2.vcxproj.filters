@@ -48,6 +48,12 @@
     <ClCompile Include="Source\SIF\sif.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\CDVD\cdvd.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EE\timers.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Memory\memory.h">
@@ -123,6 +129,12 @@
       <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="Source\SIF\sif.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\CDVD\cdvd.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EE\timers.h">
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>

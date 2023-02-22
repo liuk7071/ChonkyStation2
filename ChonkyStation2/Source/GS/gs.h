@@ -71,6 +71,8 @@ public:
 	u64 synch1;
 	u64 synch2;
 	u64 syncv;
+	u64 dispfb1;
+	u64 display1;
 	u64 dispfb2;
 	u64 display2;
 	u64 bgcolor;
@@ -112,6 +114,11 @@ public:
 		u64 raw;
 		BitField<0, 2, u64> dir;
 	} trxdir;
+	union {
+		u64 raw;
+		BitField<0, 16, u64> x;
+		BitField<32, 16, u64> y;
+	} xyoffset_1;
 
 	OpenGL::Texture vram;
 	OpenGL::Framebuffer fb;
@@ -124,13 +131,14 @@ public:
 
 	const char* vertex_shader_source = R"(
 	#version 330 core
-	layout(location = 0) in uvec3 pos;
-	layout(location = 1) in uvec4 col;
+	layout(location = 0) in vec3 pos;
+	layout(location = 1) in vec4 col;
+	uniform vec2 offset;
 	
 	out vec4 vertex_col;
 	
 	void main() {
-		gl_Position = vec4((pos.xy / 16u) / 2048.f - 1.f, 0.f, 1.f);
+		gl_Position = vec4(((pos.x / 16.f) - (offset.x / 16.f)) / 640.f - 1.f, ((pos.y / 16.f) - (offset.y / 16.f)) / 224.f - 1.f, 0.f, 1.f);
 		vertex_col = vec4(float(col.r) / 255.f, float(col.g) / 255.f, float(col.b) / 255.f, 1.f);
 	}
 	)";
@@ -150,6 +158,7 @@ public:
 	int transfer_pixels_left = 0;
 	void PushHWREG(u64 data);
 	std::vector<Vertex> vertex_queue;
+	int required_vertices = 0;
 	void PushXYZ(Vertex vertex);
 	void ProcessUpload();
 	void ProcessCopy();

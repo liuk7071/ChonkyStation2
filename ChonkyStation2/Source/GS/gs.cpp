@@ -19,9 +19,9 @@ GS::GS() {
 		Vtx2	x	y	z   r   g   b   a		stride: 7*sizeof(uint)
 		Vtx3	x	y	z   r   g   b   a
 	*/
-	vao.setAttributeInt<GLuint>(0, 3, 7 * sizeof(GLuint), (void*)0);
+	vao.setAttributeFloat<float>(0, 3, 7 * sizeof(float), (void*)0);
 	vao.enableAttribute(0);
-	vao.setAttributeInt<GLuint>(1, 4, 7 * sizeof(GLuint), (void*)(3 * sizeof(GLuint)));
+	vao.setAttributeFloat<float>(1, 4, 7 * sizeof(float), (void*)(3 * sizeof(float)));
 	vao.enableAttribute(1);
 
 	if(!vertex_shader.create(vertex_shader_source, OpenGL::ShaderType::Vertex)) Helpers::Panic("Failed to compile vertex shader\n");
@@ -36,6 +36,13 @@ void GS::WriteInternalRegister(int reg, u64 data) {
 	switch (reg) {
 	case 0x00: {	// PRIM
 		prim = data;
+		switch(prim & 7) {
+		case 0: required_vertices = 1; break;
+		case 3: required_vertices = 3; break;
+		case 6: required_vertices = 2; break;
+		default:
+			Helpers::Panic("Got unimplemented primitive: %d\n", prim & 7);
+		}
 		break;
 	}
 	case 0x01: {	// RGBAQ
@@ -47,7 +54,14 @@ void GS::WriteInternalRegister(int reg, u64 data) {
 		vertex.coords.x() = data & 0xffff;
 		vertex.coords.y() = (data >> 16) & 0xffff;
 		vertex.coords.z() = (data >> 32) & 0xffffffff;
-		//if((prim & 7) == 0) PushXYZ(vertex);
+		PushXYZ(vertex);
+		break;
+	}
+	case 0x18: { // XYOFFSET_1
+		xyoffset_1.raw = data;
+		glUniform2f(OpenGL::uniformLocation(shader_program, "offset"), (float)xyoffset_1.x, (float)xyoffset_1.y);
+		Helpers::Debug(Helpers::Log::GSd, "X offset: %d\n", xyoffset_1.x.Value());
+		Helpers::Debug(Helpers::Log::GSd, "Y offset: %d\n", xyoffset_1.y.Value());
 		break;
 	}
 	case 0x50: {	// BITBLTBUF
@@ -103,25 +117,47 @@ void GS::PushXYZ(Vertex vertex) {
 	vertex_queue.push_back(vertex);
 
 	// Drawing kick
-	if (vertex_queue.size() == 3) {	// TODO: Currently only works with triangles (3 vertices)
+	if (vertex_queue.size() == required_vertices) {	// TODO: Currently only works with triangles (3 vertices)
 		Helpers::Debug(Helpers::Log::GSd, "(DRAWING KICK)\n");
-		unsigned int attribs[] = {
-			vertex_queue[0].coords.x(), vertex_queue[0].coords.y(), vertex_queue[0].coords.z(), vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
-			vertex_queue[1].coords.x(), vertex_queue[1].coords.y(), vertex_queue[1].coords.z(), vertex_queue[1].col.r(), vertex_queue[1].col.g(), vertex_queue[1].col.b(), vertex_queue[1].col.a(),
-			vertex_queue[2].coords.x(), vertex_queue[2].coords.y(), vertex_queue[2].coords.z(), vertex_queue[2].col.r(), vertex_queue[2].col.g(), vertex_queue[2].col.b(), vertex_queue[2].col.a()
-		};
-		/*unsigned int attribs[] = {
-			31680, 32752, 0,
-			31664, 31752, 0,
-			31680, 31752, 0
-		};*/
-		//unsigned int attribs[] = {
-		//	20000, 10000, 0,
-		//	10000, 30000, 0,
-		//	30000, 30000, 0
-		//};
-		glBufferData(GL_ARRAY_BUFFER, sizeof(attribs), attribs, GL_STATIC_DRAW);
-		OpenGL::draw(OpenGL::Primitives::Triangle, 3);
+		if (required_vertices == 3) {
+			float attribs[] = {
+				vertex_queue[0].coords.x(), vertex_queue[0].coords.y(), vertex_queue[0].coords.z(), vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
+				vertex_queue[1].coords.x(), vertex_queue[1].coords.y(), vertex_queue[1].coords.z(), vertex_queue[1].col.r(), vertex_queue[1].col.g(), vertex_queue[1].col.b(), vertex_queue[1].col.a(),
+				vertex_queue[2].coords.x(), vertex_queue[2].coords.y(), vertex_queue[2].coords.z(), vertex_queue[2].col.r(), vertex_queue[2].col.g(), vertex_queue[2].col.b(), vertex_queue[2].col.a()
+			};
+			/*unsigned int attribs[] = {
+				31680, 32752, 0,
+				31664, 31752, 0,
+				31680, 31752, 0
+			};*/
+			//unsigned int attribs[] = {
+			//	20000, 10000, 0,
+			//	10000, 30000, 0,
+			//	30000, 30000, 0
+			//};
+			glBufferData(GL_ARRAY_BUFFER, sizeof(attribs), attribs, GL_STATIC_DRAW);
+			OpenGL::draw(OpenGL::Primitives::Triangle, 3);
+		}
+		else if (required_vertices == 2) {
+			float attribs[] = {
+				vertex_queue[0].coords.x(), vertex_queue[0].coords.y(), 0.f, vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
+				vertex_queue[1].coords.x(), vertex_queue[0].coords.y(), 0.f, vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
+				vertex_queue[1].coords.x(), vertex_queue[1].coords.y(), 0.f, vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
+				vertex_queue[1].coords.x(), vertex_queue[1].coords.y(), 0.f, vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
+				vertex_queue[0].coords.x(), vertex_queue[1].coords.y(), 0.f, vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
+				vertex_queue[0].coords.x(), vertex_queue[0].coords.y(), 0.f, vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a()
+			};
+
+			glBufferData(GL_ARRAY_BUFFER, sizeof(attribs), attribs, GL_STATIC_DRAW);
+			OpenGL::draw(OpenGL::Primitives::Triangle, 6);
+		}
+		else if (required_vertices == 1) {
+			float attribs[] = {
+				vertex_queue[0].coords.x(), vertex_queue[0].coords.y(), vertex_queue[0].coords.z(), vertex_queue[0].col.r(), vertex_queue[0].col.g(), vertex_queue[0].col.b(), vertex_queue[0].col.a(),
+			};
+			glBufferData(GL_ARRAY_BUFFER, sizeof(attribs), attribs, GL_STATIC_DRAW);
+			OpenGL::draw(OpenGL::Primitives::Point, 1);
+		}
 		vertex_queue.clear();
 	}
 }

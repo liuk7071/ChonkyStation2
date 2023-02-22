@@ -1,6 +1,7 @@
 #include "Memory/memory.h"
 #include "EE/EE.h"
 #include "IOP/iop.h"
+#include "CDVD/cdvd.h"
 
 class Ps2 {
 public:
@@ -10,7 +11,8 @@ public:
 	GS gs;
 	GIF gif = GIF(&gs);
 	SIF sif;
-	Memory memory = Memory(&dma, &iopdma, &gif, &sif, &gs);
+	CDVD cdvd = CDVD("H:\\Games\\roms\\PS2\\Atelier Iris - Eternal Mana (USA) (En,Ja).iso");
+	Memory memory = Memory(&dma, &iopdma, &gif, &sif, &gs, &cdvd);
 	EE ee = EE(&memory);
 	IOP iop = IOP(&memory);
 };

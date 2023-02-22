@@ -7,7 +7,10 @@ void GIF::PackedTransfer(u128 qword) {
 		break;
 	}
 	case 0x1: {
-		gs->WriteInternalRegister(1, qword.b64[0]);
+		gs->rgbaq.r = qword.b64[0] & 0xff;
+		gs->rgbaq.g = (qword.b64[0] >> 32) & 0xff;
+		gs->rgbaq.b = qword.b64[1] & 0xff;
+		gs->rgbaq.a = (qword.b64[1] >> 32) & 0xff;
 		break;
 	}
 	case 0x4: {
