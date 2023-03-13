@@ -15,6 +15,7 @@ public:
 
 	// Registers
 	u128 gprs[32];
+	float fprs[32];
 	u128 lo, hi;
 	u128 cop0r[31];
 	std::string gpr[32] = { "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3", "$t0", "$t1", "$t2", "$t3","$t4", "$t5", "$t6", "$t7", "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7","$t8", "$t9", "$k0", "$k1", "$gp", "$sp", "$fp", "$ra" };
@@ -64,6 +65,7 @@ public:
 		BEQL    = 0x14,
 		BNEL    = 0x15,
 		BLEZL   = 0x16,
+		BGTZL   = 0x17,
 		DADDIU  = 0x19,
 		LDL     = 0x1a,
 		LDR     = 0x1b,
@@ -89,6 +91,7 @@ public:
 		LD      = 0x37,
 		LWC1    = 0x31,
 		SWC1    = 0x39,
+		SQC2    = 0x3e,
 		SD      = 0x3f
 	};
 	enum SPECIAL {
@@ -166,6 +169,8 @@ public:
 		PMFHLLW = 0,
 	};
 	enum MMI0 {
+		PSUBB  = 0x09,
+		PEXTLW = 0x12,
 		PADDSH = 0x17,
 		PPAC5  = 0x1f
 	};
@@ -174,11 +179,18 @@ public:
 		PCEQB  = 0x0a
 	};
 	enum MMI2 {
+		PMFHI  = 0x08,
+		PMFLO  = 0x09,
 		PCPYLD = 0x0e,
+		PAND   = 0x12,
+		PXOR   = 0x13,
 	};
 	enum MMI3 {
+		PMTHI  = 0x08,
+		PMTLO  = 0x09,
 		PCPYUD = 0x0e,
 		POR    = 0x12,
+		PNOR   = 0x13,
 		PCPYH  = 0x1b
 	};
 	enum COP0 {
@@ -186,6 +198,9 @@ public:
 		MTC0 = 0x04,
 		BC0  = 0x08,
 		TLB  = 0x10
+	};
+	enum FPU {
+		MTC1 = 0x04,
 	};
 	enum TLB {
 		TLBWI = 0x02,

@@ -3,11 +3,18 @@
 #include "../common.h"
 #include <queue>
 
+#define IOP_CLOCK (36864000)
+#define CD_READ_SPEED (24 * 153600)
+
 class CDVD {
 public:
+	void Step();
+
 	bool irq = false;
 	FILE* dvd;
 	u32 i_stat = 0;
+	u8 status = 2;
+	u8 sticky_status = 0;
 
 	CDVD(const char* dir) {
 		dvd = fopen(dir, "rb");
@@ -22,11 +29,15 @@ public:
 	};
 	S_COMMAND_STATUS s_command_status;
 
+	std::queue<u8> s_params;
+	void SendSParameter(u8 param);
 	void SendSCommand(u8 cmd);
 	u32 ReadSCommandResponse();
 
 	enum S_COMMANDS {
+		Subcommand		  = 0x03,
 		UpdateStickyFlags = 0x05,
+		ReadRTC           = 0x08,
 		OpenConfig        = 0x40,
 		ReadConfig        = 0x41
 	};
@@ -43,11 +54,25 @@ public:
 	}
 	void SendNParameter(u8 param);
 	void SendNCommand(u8 cmd);
+	void Break();
 	static u32 ReadSectorBuffer(u128 unused, void* cdvdptr);
 
 	enum N_COMMANDS {
-		ReadCD = 0x06
+		ReadCD  = 0x06,
+		ReadDVD = 0x08
 	};
 
-	void CDReadSector(u32 loc, int block_size, u32 n);
+	bool read_queued = false;
+	int counter = 0;
+	u32 loc = 0;
+	unsigned int block_size = 0;
+	u32 n = 0;
+	void QueueRead();
+	void CDReadSector();
+	void DVDReadSector();
+	enum class queued_t {
+		CD,
+		DVD
+	};
+	queued_t queued;
 };

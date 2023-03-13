@@ -28,6 +28,7 @@ u32 SIF::SendSIF1(u128 qword, void* sifptr) {
 
 u32 SIF::ReadSIF0(u128 unused, void* sifptr) {
 	SIF* sif = (SIF*)sifptr;
+	if (sif->sif0_empty) Helpers::Panic("Tried to read empty SIF0");
 	//if (sif->sif1_index >= sif->sif1_fifo.size()) Helpers::Panic("SIF0 FIFO Out of bounds access (index: %d)\n", sif->sif1_index);
 	u32 word = sif->sif0_fifo.front();
 	sif->sif0_fifo.pop();

@@ -56,11 +56,11 @@ namespace Helpers {
 //#define LOG_ELF
 //#define LOG_EE
 //#define LOG_MEM
-#define LOG_DMA
+//#define LOG_DMA
 //#define LOG_GIF
-#define LOG_GS
+//#define LOG_GS
 //#define LOG_SIF
-#define LOG_CDVD
+//#define LOG_CDVD
 	static bool ShouldLog(Log log) {
 		if (log == Log::ELFd) {
 #ifdef LOG_ELF

@@ -27,7 +27,7 @@ int main() {
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\OSDSYS");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\SCUS_973.28");
     //ps2.ee.pc = ps2.memory.LoadELF("C:\\Users\\zacse\\Downloads\\cube.elf");
-    ps2.memory.LoadBIOS("C:\\Users\\zacse\\Downloads\\ps2_bios\\scph39001.bin");
+    ps2.memory.LoadBIOS("C:\\Users\\zacse\\Downloads\\ps2_bios\\scph10000.bin");
 
     bool quit = false;
     int cycle_count = 0;
@@ -37,8 +37,15 @@ int main() {
             ps2.gs.csr |= (1 << 3); // VSINT
             ps2.memory.iop_i_stat |= 1; // VBLANK START
             ps2.memory.iop_i_stat |= 1 << 11; // VBLANK END
+            ps2.memory.intc_stat |= 1 << 9;
+            ps2.memory.intc_stat |= 1 << 10;
+            ps2.memory.intc_stat |= 1 << 11;
             ps2.memory.intc_stat |= 1 << 12;
-            //ps2.memory.iop_i_stat |= 1 << 3;
+
+            //ps2.memory.iop_i_stat |= 1 << 4;
+            //ps2.memory.iop_i_stat |= 1 << 5;
+            //ps2.memory.iop_i_stat |= 1 << 6;
+            ps2.memory.iop_i_stat |= 1 << 16;
             //if (ps2.memory.iop_i_mask & (1 << 9)) {
             //    ps2.memory.iop_i_stat |= 1 << 9; // SPU2
             //    printf("Firing SPU2 INTERRUPT\n");
@@ -63,11 +70,12 @@ int main() {
 
             //SDL_GL_SwapWindow(window);
             cycle_count = 0;
-            printf("0x%08x, 0x%08x\n", ps2.iop.pc, ps2.memory.iop_i_mask);
-            //std::ofstream file("ramiop.bin", std::ios::binary);
-            //file.write((const char*)ps2.memory.iop_ram, 2 MB);
+            //printf("0x%08x, 0x%08x\n", ps2.ee.pc, ps2.memory.iop_i_mask);
+            //std::ofstream file("ram.bin", std::ios::binary);
+            //file.write((const char*)ps2.memory.ram, 32 MB);
         }
 
+        ps2.cdvd.Step();
         ps2.ee.Step();
         ps2.ee.Step();
         ps2.ee.Step();
@@ -77,12 +85,21 @@ int main() {
         ps2.ee.Step();
         ps2.ee.Step();
         ps2.iop.step();
+
         if (ps2.dma.SIF0.sif0_running) {
-            for (int i = 0; i < 100000; i++) ps2.iop.step();
+            for (int i = 0; i < 100000; i++) {
+                ps2.cdvd.Step(); ps2.iop.step();
+            }
+
             ps2.dma.SIF0.DoDMA(ps2.memory.ram, ps2.sif.ReadSIF0, &ps2.sif);
+            if (!ps2.dma.SIF0.sif0_running) {
+                ps2.dma.STAT |= 1 << 5;
+                if ((ps2.dma.STAT & 0x3ff) & ((ps2.dma.STAT >> 16) & 0x3ff))
+                    ps2.memory.int1 = true;
+            }
         }
         if (ps2.iopdma.SIF1.sif_running) {
-            for (int i = 0; i < 100000; i++) ps2.ee.Step();
+            for (int i = 0; i < 10000; i++) ps2.ee.Step();
             ps2.iopdma.SIF1.DoDMA(ps2.memory.iop_ram, ps2.sif.ReadSIF1, &ps2.sif);
         }
         cycle_count += 2;

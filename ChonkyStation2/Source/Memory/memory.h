@@ -45,19 +45,24 @@ public:
 	uint16_t tmr1_stub = 0;
 
 	// Memory reading/writing
+	u32 iop_i_ctrl;
 	u32 iop_i_stat;
 	u32 iop_i_mask;
 	template<typename T> T Read(u32 vaddr);
 	template<typename T> void Write(u32 vaddr, T data);
 
 	// IOP Timers -- ported from ChonkyStation
-	typedef struct IOPTimer {
-		uint16_t current_value;
-		uint16_t counter_mode;
-		uint16_t target_value;
-	};
-	IOPTimer tmr0, tmr1, tmr2;
+	IOPTimer<u16, 0> tmr0;
+	IOPTimer<u16, 1> tmr1;
+	IOPTimer<u16, 2> tmr2;
+	IOPTimer<u32, 3> tmr3;
+	IOPTimer<u32, 4> tmr4;
+	IOPTimer<u32, 5> tmr5;
+
 	int tmr1_temp, tmr2_temp;
+
+	bool iop_printing = false;
+	u32 printf_addr = 0;
 
 	u32 dmacen = 0;
 	template<typename T> T IOPRead(u32 vaddr);

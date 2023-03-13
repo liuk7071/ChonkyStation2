@@ -33,4 +33,5 @@ public:
 
 	u32 ctrl = 0;
 	u32 stat = 0;
+	u32 mode = 0;
 };

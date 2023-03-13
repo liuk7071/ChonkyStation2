@@ -534,7 +534,7 @@ void IOP::execute(uint32_t instr) {
 		uint32_t addr = regs[rs] + sign_extended_imm;
 		debug_log("lbu %s, 0x%.4x(%s)", reg[rt].c_str(), imm, reg[rs].c_str());
 		if ((COP0.regs[12] & 0x10000) == 0) {
-			uint8_t byte = mem->IOPRead<u32>(addr);
+			uint8_t byte = mem->IOPRead<u8>(addr);
 			regs[rt] = uint32_t(byte);
 			debug_log("\n");
 		}
@@ -698,7 +698,7 @@ void IOP::step() {
 		}
 		//mem->cdvd->irq = false;
 	}
-	if (mem->iop_i_stat & mem->iop_i_mask) {
+	if (mem->iop_i_ctrl && (mem->iop_i_stat & mem->iop_i_mask)) {
 		COP0.regs[13] |= (1 << 10);
 		if ((COP0.regs[12] & 1) && (COP0.regs[12] & (1 << 10))) {
 			//printf("[INTC] (IOP) Interrupt fired\n");
@@ -711,8 +711,14 @@ void IOP::step() {
 	debug_log("0x%.8X | 0x%.8X: ", pc, instr);
 #endif
 
+	mem->tmr0.step();
+	mem->tmr1.step();
+	mem->tmr2.step();
+	mem->tmr3.step();
+	mem->tmr4.step();
+	mem->tmr5.step();
 
-	auto clock_source = (mem->tmr1.counter_mode >> 8) & 3;
+	/*auto clock_source = (mem->tmr1.counter_mode >> 8) & 3;
 	auto reset_counter = (mem->tmr1.counter_mode >> 3) & 1;
 	auto irq_when_target = (mem->tmr1.counter_mode >> 4) & 1;
 	auto sync_mode = (mem->tmr1.counter_mode >> 1) & 3;
@@ -746,7 +752,7 @@ void IOP::step() {
 			mem->tmr2_temp = 0;
 		}
 	}
-	else mem->tmr2.current_value++;
+	else mem->tmr2.current_value++;*/
 
 
 	// From ps2tek
@@ -760,6 +766,18 @@ void IOP::step() {
 			pointer++;
 			text_size--;
 		}
+	}
+
+	// Hacky hook to printf for newer kernels
+	if (pc == 0x8ee0) {
+		//printf("IOP enter printf\n");
+		mem->printf_addr = regs[29] + 0x14;
+		//printf("printf addr: 0x%08x\n", mem->printf_addr);
+		mem->iop_printing = true;
+	}
+	if (pc == 0x968c) {
+		//printf("IOP exit printf\n");
+		mem->iop_printing = false;
 	}
 
 	execute(instr);

@@ -278,7 +278,6 @@ void EE::Execute(Instruction instr) {
 		case TGE: {
 			if (gprs[instr.rs].b64[0] >= gprs[instr.rt].b64[0]) Exception(Exceptions::Trap);
 			break;
-			break;
 		}
 		case TEQ: {
 			if (gprs[instr.rs].b64[0] == gprs[instr.rt].b64[0]) Exception(Exceptions::Trap);
@@ -362,7 +361,6 @@ void EE::Execute(Instruction instr) {
 			}
 			trace(Helpers::Log::EEd, "bgezal %s, 0x%04x\n", gpr[instr.rs.Value()], offset);
 			break;
-			break;
 		}
 		case MTSAH: {
 			// TODO
@@ -435,7 +433,7 @@ void EE::Execute(Instruction instr) {
 		break;
 	}
 	case SLTIU: {
-		gprs[instr.rt].b64[0] = (gprs[instr.rs].b64[0] < (s64)(s16)instr.imm);
+		gprs[instr.rt].b64[0] = (gprs[instr.rs].b64[0] < (u64)(s16)instr.imm);
 		trace(Helpers::Log::EEd, "sltiu %s, %s, 0x%04x\n", gpr[instr.rt.Value()].c_str(), gpr[instr.rs.Value()].c_str(), instr.imm.Value());
 		break;
 	}
@@ -494,7 +492,11 @@ void EE::Execute(Instruction instr) {
 #ifdef FASTBOOT
 				// Fastboot hack
 				if (pc == 0x82000) {
-					const char* dir = "cdrom0:\\\\SLUS_211.13;1";
+					const char* dir = "cdrom0:\\\\SLUS_211.13;1"; // Atelier Iris
+					//const char* dir = "cdrom0:\\\\SCUS_973.28;1"; // Gran Turismo 4
+					//const char* dir = "cdrom0:\\\\SLUS_217.28;1"; // Crash - Mind Over Mutant
+					//const char* dir = "cdrom0:\\\\SLPM_664.72;1"; // Planetarian
+					//const char* dir = "cdrom0:\\\\SLES_525.63;1"; // FIFA 05
 					std::memcpy(&mem->ram[0x89580], dir, strlen(dir));
 				}
 				mem->fastbooted = true;
@@ -507,6 +509,8 @@ void EE::Execute(Instruction instr) {
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02b\\demo2b.elf");
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\graph.elf");
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\cube.elf");
+					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\SLES_525.63");
+					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\SLUS_211.13");
 					//branch_pc = std::nullopt;
 					//traceb = true;
 					sideload_elf = false;
@@ -536,7 +540,23 @@ void EE::Execute(Instruction instr) {
 		break;
 	}
 	case COP1: {
-		printf("Unimplemented COP1 instruction 0x%08x\n", instr.raw);
+		switch (instr.rs) {
+		case FPU::MTC1: {
+			fprs[instr.rd] = gprs[instr.rt].b32[0];
+			trace(Helpers::Log::EEd, "mtc1 r%d, f%d\n", instr.rt, instr.rd);
+			break;
+		}
+		// SPECIAL1
+		case 0x10: {
+			switch (instr.raw & 0x3f) {
+			default:
+				printf("Unimplemented FPU SPECIAL1 instruction 0x%02x\n", instr.raw & 0x3f);
+			}
+			break;
+		}
+		default:
+			printf("Unimplemented FPU instruction 0x%02x\n", instr.rs.Value());
+		}
 		break;
 	}
 	case COP2: {
@@ -574,6 +594,17 @@ void EE::Execute(Instruction instr) {
 			pc += 4;
 		}
 		trace(Helpers::Log::EEd, "blezl %s, 0x%04x\n", gpr[instr.rs.Value()], offset);
+		break;
+	}
+	case BGTZL: {
+		u32 offset = instr.imm;
+		if ((s64)gprs[instr.rs].b64[0] > 0) {
+			branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+		}
+		else {
+			pc += 4;
+		}
+		trace(Helpers::Log::EEd, "bgtzl %s, 0x%04x\n", gpr[instr.rs.Value()], offset);
 		break;
 	}
 	case DADDIU: {
@@ -623,6 +654,21 @@ void EE::Execute(Instruction instr) {
 		}
 		case MMI0: {
 			switch ((instr.raw >> 6) & 0x1f) {
+			case PSUBB: {
+				for (int i = 0; i < 16; i++) {
+					gprs[instr.rd].b8[i] = gprs[instr.rs].b8[i] - gprs[instr.rt].b8[i];
+				}
+				trace(Helpers::Log::EEd, "psubb %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				break;
+			}
+			case PEXTLW: {
+				gprs[instr.rd].b32[0] = gprs[instr.rt].b32[0];
+				gprs[instr.rd].b32[1] = gprs[instr.rs].b32[0];
+				gprs[instr.rd].b32[2] = gprs[instr.rt].b32[1];
+				gprs[instr.rd].b32[3] = gprs[instr.rs].b32[1];
+				trace(Helpers::Log::EEd, "pextlw %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				break;
+			}
 			case PADDSH: {
 				// TODO: Saturate overflow to 0x7fff, saturate underflow to 0x8000
 				for (int i = 0; i < 8; i++) {
@@ -650,10 +696,34 @@ void EE::Execute(Instruction instr) {
 		}
 		case MMI2: {
 			switch ((instr.raw >> 6) & 0x1f) {
+			case PMFHI: {
+				gprs[instr.rd].b64[0] = hi.b64[0];
+				gprs[instr.rd].b64[1] = hi.b64[1];
+				trace(Helpers::Log::EEd, "pmfhi %s\n", gpr[instr.rd.Value()].c_str());
+				break;
+			}
+			case PMFLO: {
+				gprs[instr.rd].b64[0] = lo.b64[0];
+				gprs[instr.rd].b64[1] = lo.b64[1];
+				trace(Helpers::Log::EEd, "pmflo %s\n", gpr[instr.rd.Value()].c_str());
+				break;
+			}
 			case PCPYLD: {
 				gprs[instr.rd].b64[1] = gprs[instr.rs].b64[0];
 				gprs[instr.rd].b64[0] = gprs[instr.rt].b64[0];
 				trace(Helpers::Log::EEd, "pcpyld %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				break;
+			}
+			case PAND: {
+				gprs[instr.rd].b64[0] = (gprs[instr.rs].b64[0] & gprs[instr.rt].b64[0]);
+				gprs[instr.rd].b64[1] = (gprs[instr.rs].b64[1] & gprs[instr.rt].b64[1]);
+				trace(Helpers::Log::EEd, "pand %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+				break;
+			}
+			case PXOR: {
+				gprs[instr.rd].b64[0] = (gprs[instr.rs].b64[0] ^ gprs[instr.rt].b64[0]);
+				gprs[instr.rd].b64[1] = (gprs[instr.rs].b64[1] ^ gprs[instr.rt].b64[1]);
+				trace(Helpers::Log::EEd, "pxor %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 				break;
 			}
 			default:
@@ -724,8 +794,8 @@ void EE::Execute(Instruction instr) {
 			}
 			case PCEQB: {
 				for (int i = 0; i < 16; i++) {
-					if (gprs[instr.rs].b8[i] == gprs[instr.rt].b8[i]) gprs[instr.rd].b8[0] = 0xff;
-					else gprs[instr.rd].b8[0] = 0;
+					if (gprs[instr.rs].b8[i] == gprs[instr.rt].b8[i]) gprs[instr.rd].b8[i] = 0xff;
+					else gprs[instr.rd].b8[i] = 0;
 				}
 				trace(Helpers::Log::EEd, "pceqb %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
 				break;
@@ -737,6 +807,18 @@ void EE::Execute(Instruction instr) {
 		}
 		case MMI3: {
 			switch ((instr.raw >> 6) & 0x1f) {
+			case PMTHI: {
+				hi.b64[0] = gprs[instr.rs].b64[0];
+				hi.b64[1] = gprs[instr.rs].b64[1];
+				trace(Helpers::Log::EEd, "pmthi %s\n", gpr[instr.rd.Value()].c_str());
+				break;
+			}
+			case PMTLO: {
+				lo.b64[0] = gprs[instr.rs].b64[0];
+				lo.b64[1] = gprs[instr.rs].b64[1];
+				trace(Helpers::Log::EEd, "pmtlo %s\n", gpr[instr.rd.Value()].c_str());
+				break;
+			}
 			case PCPYUD: {
 				gprs[instr.rd].b64[0] = gprs[instr.rs].b64[1];
 				gprs[instr.rd].b64[1] = gprs[instr.rt].b64[1];
@@ -747,6 +829,12 @@ void EE::Execute(Instruction instr) {
 				gprs[instr.rd].b64[0] = (gprs[instr.rs].b64[0] | gprs[instr.rt].b64[0]);
 				gprs[instr.rd].b64[1] = (gprs[instr.rs].b64[1] | gprs[instr.rt].b64[1]);
 				trace(Helpers::Log::EEd, "por %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
+				break;
+			}
+			case PNOR: {
+				gprs[instr.rd].b64[0] = ~(gprs[instr.rs].b64[0] | gprs[instr.rt].b64[0]);
+				gprs[instr.rd].b64[1] = ~(gprs[instr.rs].b64[1] | gprs[instr.rt].b64[1]);
+				trace(Helpers::Log::EEd, "pnor %s, %s, %s\n", gpr[instr.rd.Value()], gpr[instr.rs.Value()], gpr[instr.rt.Value()]);
 				break;
 			}
 			case PCPYH: {
@@ -955,6 +1043,10 @@ void EE::Execute(Instruction instr) {
 	}
 	case SWC1: {
 		trace(Helpers::Log::EEd, "swc1\n");
+		break;
+	}
+	case SQC2: {
+		trace(Helpers::Log::EEd, "sqc2\n");
 		break;
 	}
 	case SD: {

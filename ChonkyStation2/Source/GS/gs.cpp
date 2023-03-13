@@ -95,6 +95,7 @@ void GS::WriteInternalRegister(int reg, u64 data) {
 }
 
 void GS::PushHWREG(u64 data) {
+	//printf("data 0x%016x\n", data);
 	transfer_pixels_left -= 2;
 	transfer_buffer.push_back(data & 0xffffffff);
 	transfer_buffer.push_back(data >> 32);
