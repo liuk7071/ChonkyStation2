@@ -711,12 +711,20 @@ void IOP::step() {
 	debug_log("0x%.8X | 0x%.8X: ", pc, instr);
 #endif
 
+	// TODO: perhaps there is a better way to do this
 	mem->tmr0.step();
 	mem->tmr1.step();
 	mem->tmr2.step();
 	mem->tmr3.step();
 	mem->tmr4.step();
 	mem->tmr5.step();
+
+	if (mem->tmr0.irq) { mem->iop_i_stat |= 1 << 4; mem->tmr0.irq = false; }
+ 	if (mem->tmr1.irq) { mem->iop_i_stat |= 1 << 5; mem->tmr1.irq = false; }
+ 	if (mem->tmr2.irq) { mem->iop_i_stat |= 1 << 6; mem->tmr2.irq = false; }
+	if (mem->tmr3.irq) { mem->iop_i_stat |= 1 << 14; mem->tmr3.irq = false; }
+	if (mem->tmr4.irq) { mem->iop_i_stat |= 1 << 15; mem->tmr4.irq = false; } 
+	if (mem->tmr5.irq) { mem->iop_i_stat |= 1 << 16; mem->tmr5.irq = false; } 
 
 	/*auto clock_source = (mem->tmr1.counter_mode >> 8) & 3;
 	auto reset_counter = (mem->tmr1.counter_mode >> 3) & 1;
@@ -756,7 +764,7 @@ void IOP::step() {
 
 
 	// From ps2tek
-	if (pc == 0x12C48 || pc == 0x1420C || pc == 0x1430C) {
+	/*if (pc == 0x12C48 || pc == 0x1420C || pc == 0x1430C) {
 		uint32_t pointer = regs[5];
 		uint32_t text_size = regs[6];
 		while (text_size) {
@@ -766,7 +774,7 @@ void IOP::step() {
 			pointer++;
 			text_size--;
 		}
-	}
+	}*/
 
 	// Hacky hook to printf for newer kernels
 	if (pc == 0x8ee0) {

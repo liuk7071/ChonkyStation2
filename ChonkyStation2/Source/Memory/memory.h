@@ -44,6 +44,10 @@ public:
 	// EE Timer stub
 	uint16_t tmr1_stub = 0;
 
+	// SPU2 stub
+	u16 corestat = 0;
+	u16 coreattr = 0;
+
 	// Memory reading/writing
 	u32 iop_i_ctrl;
 	u32 iop_i_stat;

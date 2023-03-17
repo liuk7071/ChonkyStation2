@@ -16,6 +16,16 @@ EE::EE(Memory* memptr) {
 	mem = memptr;
 	cop0r[15].b64[0] = 0x69;
 	mem->pc = &pc;
+
+	// Setup timers
+	mem->t0.intc_stat = &mem->intc_stat;
+	mem->t1.intc_stat = &mem->intc_stat;
+	mem->t2.intc_stat = &mem->intc_stat;
+	mem->t3.intc_stat = &mem->intc_stat;
+	mem->t0.id = 0;
+	mem->t1.id = 1;
+	mem->t2.id = 2;
+	mem->t3.id = 3;
 }
 
 void EE::Exception(unsigned int exception, bool int1) {
@@ -293,6 +303,11 @@ void EE::Execute(Instruction instr) {
 			trace(Helpers::Log::EEd, "dsrl %s, %s, %d\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rt.Value()].c_str(), instr.sa.Value());
 			break;
 		}
+		case DSRA: {
+			gprs[instr.rd].b64[0] = ((s64)gprs[instr.rt].b64[0] >> instr.sa);
+			trace(Helpers::Log::EEd, "dsra %s, %s, %d\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rt.Value()].c_str(), instr.sa.Value());
+			break;
+		}
 		case DSLL32: {
 			gprs[instr.rd].b64[0] = (gprs[instr.rt].b64[0] << (instr.sa + 32));
 			trace(Helpers::Log::EEd, "dsll32 %s, %s, %d\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rt.Value()].c_str(), instr.sa.Value());
@@ -494,6 +509,7 @@ void EE::Execute(Instruction instr) {
 				if (pc == 0x82000) {
 					const char* dir = "cdrom0:\\\\SLUS_211.13;1"; // Atelier Iris
 					//const char* dir = "cdrom0:\\\\SCUS_973.28;1"; // Gran Turismo 4
+					//const char* dir = "cdrom0:\\\\SLUS_212.67;1"; // Need for Speed Most Wanted
 					//const char* dir = "cdrom0:\\\\SLUS_217.28;1"; // Crash - Mind Over Mutant
 					//const char* dir = "cdrom0:\\\\SLPM_664.72;1"; // Planetarian
 					//const char* dir = "cdrom0:\\\\SLES_525.63;1"; // FIFA 05
@@ -654,6 +670,13 @@ void EE::Execute(Instruction instr) {
 		}
 		case MMI0: {
 			switch ((instr.raw >> 6) & 0x1f) {
+			case PSUBW: {
+				for (int i = 0; i < 4; i++) {
+					gprs[instr.rd].b32[i] = gprs[instr.rs].b32[i] - gprs[instr.rt].b32[i];
+				}
+				trace(Helpers::Log::EEd, "psubw %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				break;
+			}
 			case PSUBB: {
 				for (int i = 0; i < 16; i++) {
 					gprs[instr.rd].b8[i] = gprs[instr.rs].b8[i] - gprs[instr.rt].b8[i];
@@ -790,6 +813,14 @@ void EE::Execute(Instruction instr) {
 				gprs[instr.rd].b32[2] = gprs[instr.rs].b32[2] + gprs[instr.rt].b32[2];
 				gprs[instr.rd].b32[3] = gprs[instr.rs].b32[3] + gprs[instr.rt].b32[3];
 				trace(Helpers::Log::EEd, "padduw %s, %s, %s\n", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				break;
+			}
+			case PEXTUW: {
+				gprs[instr.rd].b32[0] = gprs[instr.rt].b32[2];
+				gprs[instr.rd].b32[1] = gprs[instr.rs].b32[2];
+				gprs[instr.rd].b32[2] = gprs[instr.rt].b32[3];
+				gprs[instr.rd].b32[3] = gprs[instr.rs].b32[3];
+				trace(Helpers::Log::EEd, "pextuw %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
 				break;
 			}
 			case PCEQB: {
@@ -1037,6 +1068,10 @@ void EE::Execute(Instruction instr) {
 		trace(Helpers::Log::EEd, "ld %s, 0x%04x(%s) ; %s <- mem[0x%08x] (0x%04x)\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str(), address, data);
 		break;
 	}
+	case LQC2: {
+		trace(Helpers::Log::EEd, "lqc2\n");
+		break;
+	}
 	case LWC1: {
 		trace(Helpers::Log::EEd, "lwc1\n");
 		break;
@@ -1154,6 +1189,14 @@ void EE::Step() {
 			Exception(Exceptions::Interrupt, true);
 			printf("[INTC] INT1 Fired\n");
 			mem->int1 = false;
+		}
+	}
+
+	if ((mem->intc_stat & mem->intc_mask) && (cop0r[12].b64[0] & 1) && ((cop0r[12].b64[0] >> 16) & 1) && !((cop0r[12].b64[0] >> 1) & 1) && !((cop0r[12].b64[0] >> 2) & 1)) {
+		cop0r[13].b64[0] |= 1 << 10;
+		if (cop0r[12].b64[0] & (1 << 10)) {
+			printf("[INTC] INT0\n");
+			Exception(Exceptions::Interrupt, false);
 		}
 	}
 

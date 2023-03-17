@@ -5,6 +5,9 @@
 
 #include "Source/ps2.h"
 
+std::map<int, bool> keyboard;
+bool vblank = false;
+
 int main() {
     // SDL2 / OpenGL initialization
     SDL_Init(SDL_INIT_EVERYTHING & ~SDL_INIT_HAPTIC);
@@ -33,19 +36,31 @@ int main() {
     int cycle_count = 0;
     u8* out = new u8[2048 * 2048 * 4];
     while (!quit) {
-        if (cycle_count > 100000) { // Temporarily just a random number
+        if (cycle_count > 500000) { // Temporarily just a random number
             ps2.gs.csr |= (1 << 3); // VSINT
-            ps2.memory.iop_i_stat |= 1; // VBLANK START
-            ps2.memory.iop_i_stat |= 1 << 11; // VBLANK END
-            ps2.memory.intc_stat |= 1 << 9;
-            ps2.memory.intc_stat |= 1 << 10;
-            ps2.memory.intc_stat |= 1 << 11;
-            ps2.memory.intc_stat |= 1 << 12;
+            ps2.gs.csr ^= 1 << 13;
+            if (!vblank) {
+                // VBLANK START
+                ps2.memory.intc_stat |= 1 << 2;
+                ps2.memory.iop_i_stat |= 1; 
+                vblank = !vblank;
+            }
+            else {
+                // VBLANK END
+                ps2.memory.intc_stat |= 1 << 3;
+                ps2.memory.iop_i_stat |= 1 << 11;
+                vblank = !vblank;
+            }
+            //ps2.memory.intc_stat |= 1 << 9;
+            //ps2.memory.intc_stat |= 1 << 10;
+            //ps2.memory.intc_stat |= 1 << 11;
+            //ps2.memory.intc_stat |= 1 << 12;
+            
+            //ps2.memory.intc_stat |= 1;
 
             //ps2.memory.iop_i_stat |= 1 << 4;
             //ps2.memory.iop_i_stat |= 1 << 5;
             //ps2.memory.iop_i_stat |= 1 << 6;
-            ps2.memory.iop_i_stat |= 1 << 16;
             //if (ps2.memory.iop_i_mask & (1 << 9)) {
             //    ps2.memory.iop_i_stat |= 1 << 9; // SPU2
             //    printf("Firing SPU2 INTERRUPT\n");
@@ -57,8 +72,23 @@ int main() {
                 case SDL_QUIT:
                     quit = true;
                     break;
+                case SDL_KEYDOWN:
+                    keyboard[e.key.keysym.sym] = true;
+                    break;
+                case SDL_KEYUP:
+                    keyboard[e.key.keysym.sym] = false;
+                    break;
                 }
             }
+
+            if (keyboard[SDL_KeyCode::SDLK_1]) {
+                printf("UUUUUUUUUU\n");
+                ps2.memory.intc_stat |= 1 << 12;
+            }
+            if (keyboard[SDL_KeyCode::SDLK_2] && !vblank) {
+                if (ps2.ee.pc == 0x2BB4BC) ps2.ee.pc = 0x2BB4D0;
+            }
+
             // Render
             ps2.gs.vram.bind();
             glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, out);
@@ -87,20 +117,36 @@ int main() {
         ps2.iop.step();
 
         if (ps2.dma.SIF0.sif0_running) {
-            for (int i = 0; i < 100000; i++) {
-                ps2.cdvd.Step(); ps2.iop.step();
+            if (ps2.sif.sif0_fifo.size() != 0) {
+                while (ps2.sif.sif0_fifo.size() != 0) {
+                    ps2.dma.SIF0.DoDMA(ps2.memory.ram, ps2.sif.ReadSIF0, &ps2.sif);
+                    if (!ps2.dma.SIF0.sif0_running) {
+                        ps2.dma.STAT |= 1 << 5;
+                        if ((ps2.dma.STAT & 0x3ff) & ((ps2.dma.STAT >> 16) & 0x3ff))
+                            ps2.memory.int1 = true;
+                        break;
+                    }
+                }
             }
-
-            ps2.dma.SIF0.DoDMA(ps2.memory.ram, ps2.sif.ReadSIF0, &ps2.sif);
-            if (!ps2.dma.SIF0.sif0_running) {
-                ps2.dma.STAT |= 1 << 5;
-                if ((ps2.dma.STAT & 0x3ff) & ((ps2.dma.STAT >> 16) & 0x3ff))
-                    ps2.memory.int1 = true;
-            }
+            //else {
+             //   for (int i = 0; i < (ps2.ee.sideload_elf ? 70000 : 55); i++) {
+             //       ps2.cdvd.Step(); ps2.iop.step();
+            //    }
+            //}
         }
         if (ps2.iopdma.SIF1.sif_running) {
-            for (int i = 0; i < 10000; i++) ps2.ee.Step();
+            for (int i = 0; i < 20000; i++) ps2.ee.Step();
             ps2.iopdma.SIF1.DoDMA(ps2.memory.iop_ram, ps2.sif.ReadSIF1, &ps2.sif);
+            if (!ps2.iopdma.SIF1.sif_running) {
+                // IOP IRQ3
+                // TODO (kinda important): This is not entirely correct
+                ps2.iopdma.DICR2.IF = ps2.iopdma.DICR2.IF | (1 << 3);
+                ps2.iopdma.DICR.raw |= (1 << 31);
+                if (ps2.iopdma.DICR2.IM & ps2.iopdma.DICR2.IF) {
+                    //printf("[INTC] (IOP) Requesting IRQ3\n");
+                    ps2.memory.iop_i_stat |= 1 << 3;
+                }
+            }
         }
         cycle_count += 2;
     }

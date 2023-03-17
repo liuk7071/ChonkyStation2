@@ -13,6 +13,9 @@ public:
 	u16 hold = 0;
 
 	void step();
+
+	int id = 0;	// To know what timer we are, used to set the appropiate interrupt in INTC_STAT
+	u16* intc_stat;
 };
 
 template<typename T>
@@ -28,11 +31,34 @@ public:
 	u16 mode;
 	T target;
 
+	bool irq = false;	// Used to check if we need to raise the bit in I_STAT
+
 	void step() {
 		auto ext = (mode >> 8) & 1;
 
+		auto irq_enabled = (mode >> 10) & 1;
+		auto compare_enabled = (mode >> 4) & 1;
+		auto overflow_enabled = (mode >> 5) & 1;
+
 		if (!ext) {
-			counter += 2;
+			counter++;
+
+			if (irq_enabled) {
+				if (compare_enabled) {
+					if (counter == target) {
+						irq = true;
+						mode |= 1 << 11;
+					}
+				}
+				if (overflow_enabled) {
+					T overflow = 0;
+					overflow--;
+					if (counter == overflow) {
+						irq = true;
+						mode |= 1 << 12;
+					}
+				}
+			}
 		}
 		else {
 			Helpers::Panic("Unimplemented IOP Timer external signal bit\n");

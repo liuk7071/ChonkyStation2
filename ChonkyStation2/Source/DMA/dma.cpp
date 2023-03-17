@@ -34,6 +34,16 @@ void DMACGeneric::DoDMA(u8* source, u32 (*dma_handler_ptr)(u128, void*), void* d
 			unused.b64[0] = 0;
 			unused.b64[1] = 0;
 			while (!tag_end) {
+				if (is_sif0) {
+					SIF* sif = (SIF*)device;
+					if (sif->sif0_empty) {
+						CHCR.STR = false;
+						tag_end = false;
+						sif0_running = false;
+						sif->ee_sif0_queued = true;
+						return;
+					}
+				}
 				u128 tag;
 				tag.b32[0] = (*dma_handler_ptr)(unused, device);
 				tag.b32[1] = (*dma_handler_ptr)(unused, device);
@@ -60,6 +70,7 @@ void DMACGeneric::DoDMA(u8* source, u32 (*dma_handler_ptr)(u128, void*), void* d
 					std::memcpy(&transfer_start[i + 8], &qw.b64[1], sizeof(u64));
 					MADR += 16;
 				}
+				if (tag_end) goto end;
 				if (is_sif0) return;
 			}
 			break;
@@ -94,6 +105,7 @@ void DMACGeneric::DoDMA(u8* source, u32 (*dma_handler_ptr)(u128, void*), void* d
 	default:
 		Helpers::Panic("Unhandled DMA mode: %d\n", CHCR.MOD.Value());
 	}
+end:
 	CHCR.STR = false;
 	tag_end = false;
 	sif0_running = false;
@@ -269,7 +281,7 @@ chain2:
 			
 			u8* transfer_src = ram + (dma_tag & 0xffffff);
 			auto size = (dma_tag >> 32) & 0xffffff;
-			if(is_sif) size = (size + 3) & ~0x03; // Round up to next multiple of 4
+			if (is_sif) size = (size + 3) & ~0x03; // Round up to next multiple of 4
 			if (CHCR.BIT8) {
 				u32 word;
 				std::memcpy(&word, &ram[TADR + 8], sizeof(u32));

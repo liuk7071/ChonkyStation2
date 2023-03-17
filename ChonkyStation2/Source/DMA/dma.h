@@ -1,5 +1,6 @@
 #pragma once
 #include "../common.h"
+#include "../SIF/sif.h"
 
 class DMACGeneric {
 public:
@@ -125,7 +126,13 @@ public:
 	IOPDMAGeneric SIF0;
 	IOPDMAGeneric SIF1;
 	
-	u32 DICR;
+	union dicr {
+		u32 raw;
+		BitField<0, 7, u32> COMPLETION;
+		BitField<16, 7, u32> IM;
+		BitField<24, 7, u32> IF;
+	};
+	dicr DICR;
 	union dicr2 {
 		u32 raw;
 		BitField<0, 13, u32> INTR_ON_TAG;

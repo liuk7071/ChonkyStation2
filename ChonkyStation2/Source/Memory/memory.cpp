@@ -105,7 +105,7 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 
 	// GS
 	if (paddr == 0x12001000) {
-		//Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
+		Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
 		u32 data = gs->csr;
 		gs->csr &= ~(1 << 3);	// TODO: Is this when I should clear VSINT?
 		return data;
@@ -126,6 +126,10 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 	if(paddr == 0x1000a000) {
 		Helpers::Debug(Helpers::Log::DMAd, "(GIF) Read CHCR\n");
 		return dma->GIF.CHCR.raw;
+	}
+	if (paddr == 0x1000a010) {
+		Helpers::Debug(Helpers::Log::DMAd, "(GIF) Read MADR\n");
+		return dma->GIF.MADR;
 	}
 	if (paddr == 0x1000c020) {
 		Helpers::Debug(Helpers::Log::DMAd, "(SIF0) Read QWC\n");
@@ -158,7 +162,8 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 	}
 
 	if (paddr == 0x1000f000) {
-		return intc_stat;
+		//printf("intc stat\n");
+		return intc_stat | 4;
 	}
 	if (paddr == 0x1000f010) {
 		return intc_mask;
@@ -245,7 +250,7 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 		return data;
 	}
 	if (paddr == 0x12001000) {
-		//Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
+		Helpers::Debug(Helpers::Log::GSd, "Read CSR\n");
 		u64 data = gs->csr;
 		gs->csr &= ~(1 << 3);	// TODO: Is this when I should clear VSINT?
 		return data;
@@ -336,7 +341,7 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 		return;
 	}
 	if (paddr == 0x10000010) {
-		t0.mode = data;
+		t0.mode = data & ~(3 << 10);
 		return;
 	}
 	if (paddr == 0x10000020) {
@@ -353,7 +358,7 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 		return;
 	}
 	if (paddr == 0x10000810) {
-		t1.mode = data;
+		t1.mode = data & ~(3 << 10);
 		return;
 	}
 	if (paddr == 0x10000820) {
@@ -370,7 +375,7 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 		return;
 	}
 	if (paddr == 0x10001010) {
-		t2.mode = data;
+		t2.mode = data & ~(3 << 10);
 		return;
 	}
 	if (paddr == 0x10001020) {
@@ -383,7 +388,8 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 		return;
 	}
 	if (paddr == 0x10001810) {
-		t3.mode = data;
+		printf("[TIMER] Write to timer 3 mode 0x%08x\n", data);
+		t3.mode = data & ~(3 << 10);
 		return;
 	}
 	if (paddr == 0x10001820) {
@@ -611,7 +617,7 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 		Helpers::Debug(Helpers::Log::DMAd, "(SIF0) CHCR <- 0x%08x\n", data);
 		if (dma->SIF0.MaybeStart()) {
 			if (!sif->sif0_empty) {
-				printf("Should start EE SIF0 DMA\n");
+				Helpers::Panic("Started EE SIF0 when fifo was not empty\n");
 			}
 			else {
 				printf("Should start EE SIF0 DMA but SIF0 fifo is empty, queuing transfer\n");
@@ -664,13 +670,15 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 			if (sif->iop_sif1_queued && !sif->sif1_empty) {
 				iopdma->SIF1.DoDMA(iop_ram, sif->ReadSIF1, sif);
 				sif->iop_sif1_queued = false;
-				// IOP IRQ3
-				// TODO (kinda important): This is not entirely correct
-				iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 3);
-				iopdma->DICR |= (1 << 31);
-				if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
-					//printf("[INTC] (IOP) Requesting IRQ3\n");
-					iop_i_stat |= 1 << 3;
+				if (!iopdma->SIF1.sif_running) {
+					// IOP IRQ3
+					// TODO (kinda important): This is not entirely correct
+					iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 3);
+					iopdma->DICR.raw |= (1 << 31);
+					if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
+						//printf("[INTC] (IOP) Requesting IRQ3\n");
+						iop_i_stat |= 1 << 3;
+					}
 				}
 			}
 		}
@@ -829,8 +837,9 @@ if ((vaddr & 0xFFFF8000) == 0xFFFF8000) vaddr &= 0x7ffff;
 		Helpers::Debug(Helpers::Log::DMAd, "(GIF) CHCR <- 0x%08x\n", data);
 		if (dma->GIF.MaybeStart()) {
 			dma->GIF.DoDMA(ram, &gif->SendQWord, gif);
-				int1 = true;
 			dma->STAT |= 1 << 2;
+			if ((dma->STAT & 0x3ff) & ((dma->STAT >> 16) & 0x3ff))
+				int1 = true;
 			//if ((dma->STAT & 0x3ff) & ((dma->STAT >> 18) & 0x3ff))
 		}
 		return;
@@ -1187,6 +1196,9 @@ u8 Memory::IOPRead(u32 vaddr) {
 		return iop_ram[paddr];
 	}
 
+	// SIO2
+	if (paddr == 0x1f808264) return 0;	// out fifo
+
 	// CDVD
 	if (paddr == 0x1f402004) {
 		Helpers::Debug(Helpers::Log::CDVDd, "(IOP) CDVD N command read\n");
@@ -1258,6 +1270,14 @@ u16 Memory::IOPRead(u32 vaddr) {
 	}
 
 	// SPU
+	if (paddr == 0x1F90019A) {
+		printf("(SPU) CORE_ATTR read\n");
+		return coreattr;
+	}							
+	if (paddr == 0x1F900344) {
+		printf("(SPU) CORE_STAT read\n");
+		return corestat;
+	}
 	if (paddr == 0x1f900344) {
 		//printf("(IOP) SPU2 status core1 read\n");
 		return 0;
@@ -1274,6 +1294,13 @@ u16 Memory::IOPRead(u32 vaddr) {
 	// Timers
 	if (paddr == 0x1f801494) {
 		printf("[TIMER] Read timer 4 counter mode\n");
+		tmr4.mode &= ~(1 << 11);
+		tmr4.mode &= ~(1 << 12);
+		return tmr4.counter;
+	}
+
+	if (paddr == 0x1f801494) {
+		//printf("[TIMER] Read timer 4 counter mode\n");
 		tmr4.mode &= ~(1 << 11);
 		tmr4.mode &= ~(1 << 12);
 		return tmr4.counter;
@@ -1310,6 +1337,11 @@ u32 Memory::IOPRead(u32 vaddr) {
 		return data;
 	}
 
+	// SIO2
+	if (paddr == 0x1f808280) return 0;
+	if (paddr == 0x1f80826c) return 0x1d100;	// Disconnected
+	if (paddr == 0x1f808274) return 0;	// Unknown
+
 	if (paddr == 0x1f801070) {
 		//printf("(IOP) I_STAT read\n");
 		return iop_i_stat;
@@ -1326,6 +1358,16 @@ u32 Memory::IOPRead(u32 vaddr) {
 	}
 
 	// Timers
+	if (paddr == 0x1f801490) {
+		printf("[TIMER] Read timer 4 counter value\n");
+		return tmr4.counter;
+	}
+
+	if (paddr == 0x1f801498) {
+		printf("[TIMER] Read timer 4 counter target\n");
+		return tmr4.target;
+	}
+
 	if (paddr == 0x1f8014a0) {
 		//printf("[TIMER] Read timer 5 counter value\n");
 		return tmr5.counter;
@@ -1337,7 +1379,7 @@ u32 Memory::IOPRead(u32 vaddr) {
 	}
 
 	if (paddr == 0x1f808268) {
-		printf("(IOP) (SIO2) Read SIO2_CTRL\n");
+		//printf("(IOP) (SIO2) Read SIO2_CTRL\n");
 		return 0;
 	}
 	if (paddr == 0x1f808270) return 0xf; // "Read by PADMAN. Always equal to 0xF?"
@@ -1438,7 +1480,7 @@ u32 Memory::IOPRead(u32 vaddr) {
 	}
 	if (paddr == 0x1f8010f4) {
 		//printf("(IOP) Read DICR\n");
-		return iopdma->DICR;
+		return iopdma->DICR.raw;
 	}
 	if (paddr == 0x1f801570) {
 		//printf("(IOP) Read DPCR2\n");
@@ -1457,6 +1499,7 @@ u32 Memory::IOPRead(u32 vaddr) {
 	if (paddr == 0x1f80100c) return 0; // Expansion 3 Delay/Size
 
 	if (paddr >= 0x1e000000 && (paddr <= 0x1effffff)) return 0; // TODO: Don't know what this is
+	if (paddr == 0x1f801014) return 0; // TODO: Don't know what this is
 	if (paddr == 0x1f801414) return 0; // TODO: Don't know what this is
 	if (paddr == 0x1f801400) return 0; // TODO: Don't know what this is
 	if (paddr == 0x1f801450) return 0; // TODO: Don't know what this is
@@ -1507,7 +1550,7 @@ void Memory::IOPWrite(u32 vaddr, u8 data) {
 
 	// SIO2
 	if (paddr == 0x1f808260) {
-		printf("(IOP) (SIO2) FIFOIN 0x%02x\n", data);
+		//printf("(IOP) (SIO2) FIFOIN 0x%02x\n", data);
 		return;
 	}
 
@@ -1527,8 +1570,23 @@ void Memory::IOPWrite(u32 vaddr, u16 data) {
 	}
 
 	// SPU
+	if (paddr == 0x1F90019A) {
+		printf("(SPU) CORE_ATTR write 0x%x\n", data);
+		coreattr = data;
+		corestat &= ~0x3f;
+		corestat |= coreattr & 0x3f;
+		corestat &= ~0x80;
+		corestat |= (coreattr & 0x20) << 2;
+
+		if (((coreattr >> 4) & 3) == 2) printf("boop\n");
+		return;
+	}
+	if (paddr == 0x1F900344) {
+		Helpers::Panic("(SPU) CORE_STAT write 0x%x\n", data);
+		return;
+	}
 	if (paddr >= 0x1f900000 && (paddr <= 0x1f900fff)) {
-		printf("(IOP) Ignored SPU2 register write\n");
+		printf("(IOP) Ignored SPU2 register write 0x%08x\n", paddr);
 		return;
 	}
 
@@ -1557,6 +1615,9 @@ void Memory::IOPWrite(u32 vaddr, u16 data) {
 	// Timers
 	if (paddr == 0x1f801494) {
 		printf("[TIMER] Write timer 4 counter mode\n");
+		data &= ~(1 << 11);
+		data &= ~(1 << 12);
+		data |= 1 << 10;
 		tmr4.mode = data;
 		tmr4.counter = 0;
 		return;
@@ -1564,6 +1625,9 @@ void Memory::IOPWrite(u32 vaddr, u16 data) {
 
 	if (paddr == 0x1f8014a4) {
 		printf("[TIMER] Write timer 5 counter mode\n");
+		data &= ~(1 << 11);
+		data &= ~(1 << 12);
+		data |= 1 << 10;
 		tmr5.mode = data;
 		tmr5.counter = 0;
 		return;
@@ -1599,7 +1663,7 @@ void Memory::IOPWrite(u32 vaddr, u32 data) {
 
 	// SIO2
 	if (paddr >= 0x1f808200 && paddr <= (0x1f80823f)) {
-		printf("(IOP) (SIO2) SEND3 Write: 0x%08x\n", data);
+		//printf("(IOP) (SIO2) SEND3 Write: 0x%08x\n", data);
 		return;
 	}
 	if (paddr >= 0x1f808240 && (paddr <= 0x1f80825f)) return;	// SIO2_SEND1/SEND2 - Port1/2 Control? Unknown purpose
@@ -1625,51 +1689,77 @@ void Memory::IOPWrite(u32 vaddr, u32 data) {
 	// DMAC
 	if (paddr == 0x1f801088) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (MDECin) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started MDECin dma\n");
 		return;
 	}
 
 	if (paddr == 0x1f801098) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (MDECout) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started MDECout dma\n");
 		return;
 	}
 
 	if (paddr == 0x1f8010a8) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIF2) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started SIF2 dma\n");
 		return;
 	}
 
 	if (paddr == 0x1f8010c8) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SPU1) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) {
+			printf("Started SPU1 dma\n");
+			iopdma->DICR.IF = iopdma->DICR.IF | 1 << 4;
+			iopdma->DICR.raw |= (1 << 31);
+			if (iopdma->DICR.IM & iopdma->DICR.IF) {
+				printf("[INTC] (IOP) Requesting IRQ3\n");
+				iop_i_stat |= 1 << 3;
+			}
+		}
 		return;
 	}
 	
 	if (paddr == 0x1f8010d8) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (PIO) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started PIO dma\n");
 		return;
 	}
 
 	if (paddr == 0x1f8010e8) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (OTC) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started OTC dma\n");
 		return;
 	}
 
 	if (paddr == 0x1f801508) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SPU2) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) {
+			printf("Started SPU2 dma\n");
+			iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 0);
+			iopdma->DICR.raw |= (1 << 31);
+			if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
+				printf("[INTC] (IOP) Requesting IRQ3\n");
+				iop_i_stat |= 1 << 3;
+			}
+		}
 		return;
 	}
 
 	if (paddr == 0x1f801518) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (DEV9) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started DEV9 dma\n");
 		return;
 	}
 
 	if (paddr == 0x1f801548) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIO2in) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started SIO2in dma\n");
 		return;
 	}
 
 	if (paddr == 0x1f801558) {
 		Helpers::Debug(Helpers::Log::DMAd, "(IOP) (SIO2out) CHCR <- 0x%x\n", data);
+		if ((data >> 24) & 1) Helpers::Panic("Started SIO2out dma\n");
 		return;
 	}
 	
@@ -1714,6 +1804,7 @@ void Memory::IOPWrite(u32 vaddr, u32 data) {
 			iopdma->SIF0.DoDMA(iop_ram, sif->SendSIF0, sif);
 			
 			if (sif->ee_sif0_queued && !sif->sif0_empty) {
+				printf("----I AM DOING A SIF0 DMA ON THE EE SIDE HERE----\n");
 				dma->SIF0.DoDMA(ram, sif->ReadSIF0, sif);
 				if (!dma->SIF0.sif0_running) {
 					dma->STAT |= 1 << 5;
@@ -1725,7 +1816,7 @@ void Memory::IOPWrite(u32 vaddr, u32 data) {
 			// IOP IRQ3
 			// TODO (kinda important): This is not entirely correct
 			iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 2);
-			iopdma->DICR |= (1 << 31);
+			iopdma->DICR.raw |= (1 << 31);
 			if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
 				//printf("[INTC] (IOP) Requesting IRQ3\n");
 				iop_i_stat |= 1 << 3;
@@ -1759,7 +1850,7 @@ void Memory::IOPWrite(u32 vaddr, u32 data) {
 				// IOP IRQ3
 				// TODO (kinda important): This is not entirely correct
 				iopdma->DICR2.IF = iopdma->DICR2.IF | (1 << 3);
-				iopdma->DICR |= (1 << 31);
+				iopdma->DICR.raw |= (1 << 31);
 				if (iopdma->DICR2.IM & iopdma->DICR2.IF) {
 					//printf("[INTC] (IOP) Requesting IRQ3\n");
 					iop_i_stat |= 1 << 3;
@@ -1794,9 +1885,9 @@ void Memory::IOPWrite(u32 vaddr, u32 data) {
 	}
 	if (paddr == 0x1f8010f4) {
 		//printf("(IOP) DICR <- 0x%x\n", data);
-		u32 old = iopdma->DICR;
-		iopdma->DICR = data & ~0x7f000000;
-		iopdma->DICR |= ((old & 0x7f000000) & ~(data & 0x7f000000));
+		u32 old = iopdma->DICR.raw;
+		iopdma->DICR.raw = data & ~0x7f000000;
+		iopdma->DICR.raw |= ((old & 0x7f000000) & ~(data & 0x7f000000));
 		return;
 	}
 	if (paddr == 0x1f801574) {
@@ -1854,27 +1945,40 @@ void Memory::IOPWrite(u32 vaddr, u32 data) {
 		return;
 	}
 	if (paddr == 0x1f801128) {
-		printf("[TIMER] Write timer 2 counter target\n");
+		//printf("[TIMER] Write timer 2 counter target\n");
 		tmr2.target = data;
 		return;
 	}
 
+	if (paddr == 0x1f801490) {
+		//printf("[TIMER] Write timer 4 counter value\n");
+		tmr4.counter = data;
+		return;
+	}
+	if (paddr == 0x1f801498) {
+		//printf("[TIMER] Write timer 4 counter target\n");
+		tmr4.target = data;
+		return;
+	}
+
 	if (paddr == 0x1f8014a0) {
-		printf("[TIMER] Write timer 5 counter value\n");
+		//printf("[TIMER] Write timer 5 counter value\n");
 		tmr5.counter = data;
 		return;
 	}
 	if (paddr == 0x1f8014a8) {
-		printf("[TIMER] Write timer 5 counter target\n");
+		//printf("[TIMER] Write timer 5 counter target\n");
 		tmr5.target = data;
 		return;
 	}
 
 	// SIO2
 	if (paddr == 0x1f808268) {
-		printf("(IOP) SIO2_CTRL <- 0x%08x\n", data);
+		//printf("(IOP) SIO2_CTRL <- 0x%08x\n", data);
+		if (data & 1) iop_i_stat |= 1 << 17;
 		return;
 	}
+	if (paddr == 0x1f808280) return;
 
 	if (paddr == 0x1f801004) return; // Expansion 2 Base Address
 	if (paddr == 0x1f80100c) return; // Expansion 3 Delay/Size

@@ -17,6 +17,7 @@ public:
 
 	bool sif0_empty = true;
 	bool ee_sif0_queued = false;
+	bool iop_sif0_stalled = false;
 	std::queue<u32> sif0_fifo;
 	static u32 ReadSIF0(u128 unused, void* sifptr);
 	static u32 SendSIF0(u128 word, void* sifptr);

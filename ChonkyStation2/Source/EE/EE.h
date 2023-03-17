@@ -90,6 +90,7 @@ public:
 		CACHE   = 0x2f,
 		LD      = 0x37,
 		LWC1    = 0x31,
+		LQC2	= 0x36,
 		SWC1    = 0x39,
 		SQC2    = 0x3e,
 		SD      = 0x3f
@@ -137,6 +138,7 @@ public:
 		TEQ     = 0x34,
 		DSLL    = 0x38,
 		DSRL    = 0x3a,
+		DSRA	= 0x3b,
 		DSLL32  = 0x3c,
 		DSRL32  = 0x3e,
 		DSRA32  = 0x3f
@@ -169,6 +171,7 @@ public:
 		PMFHLLW = 0,
 	};
 	enum MMI0 {
+		PSUBW  = 0x01,
 		PSUBB  = 0x09,
 		PEXTLW = 0x12,
 		PADDSH = 0x17,
@@ -176,6 +179,7 @@ public:
 	};
 	enum MMI1 {
 		PADDUW = 0x10,
+		PEXTUW = 0x12,
 		PCEQB  = 0x0a
 	};
 	enum MMI2 {

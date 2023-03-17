@@ -2,7 +2,7 @@
 
 void CDVD::Step() {
 	if (read_queued) {
-		counter--;
+		counter -= 2;
 		if (counter == 0) {
 			read_queued = false;
 			if (queued == queued_t::CD)
@@ -141,7 +141,7 @@ void CDVD::Break() {
 void CDVD::QueueRead() {
 	if (read_queued) Helpers::Panic("Tried to queue a read, but one was already queued\n");
 	read_queued = true;
-	counter = 10000;
+	counter = 5000;
 	Helpers::Debug(Helpers::Log::CDVDd, "Queued CD read in %d cycles\n", counter);
 }
 
@@ -186,7 +186,6 @@ void CDVD::DVDReadSector() {
 		// Metadata
 		sector_buffer.push_back(0 + 0x20);	// Volume number + 0x20
 		u32 temp = old_loc - 0 + 0x30000;
-		printf("0x%x\n", temp);
 		sector_buffer.push_back(temp >> 16);	// Sector number - volume start + 0x30000, in big-endian.
 		sector_buffer.push_back(temp >> 8);
 		sector_buffer.push_back(temp);
@@ -220,6 +219,8 @@ u32 CDVD::ReadSectorBuffer(u128 unused, void* cdvdptr) {
 	u32 word;
 	std::memcpy(&word, &cdvd->sector_buffer[cdvd->sector_buffer_index], sizeof(u32));
 	cdvd->sector_buffer_index += 4;
+
+	//if (cdvd->queued == queued_t::DVD) printf("0x%08x\n", word);
 
 	if (cdvd->sector_buffer_index >= (cdvd->sector_buffer.size() - 1)) {	// At this point we read all the data.
 		cdvd->irq = false;													// If the function is called again we will overflow; that's checked
