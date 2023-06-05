@@ -39,6 +39,7 @@ int main() {
         if (cycle_count > 500000) { // Temporarily just a random number
             ps2.gs.csr |= (1 << 3); // VSINT
             ps2.gs.csr ^= 1 << 13;
+            ps2.gs.csr |= 1 << 1;
             if (!vblank) {
                 // VBLANK START
                 ps2.memory.intc_stat |= 1 << 2;
@@ -79,14 +80,6 @@ int main() {
                     keyboard[e.key.keysym.sym] = false;
                     break;
                 }
-            }
-
-            if (keyboard[SDL_KeyCode::SDLK_1]) {
-                printf("UUUUUUUUUU\n");
-                ps2.memory.intc_stat |= 1 << 12;
-            }
-            if (keyboard[SDL_KeyCode::SDLK_2] && !vblank) {
-                if (ps2.ee.pc == 0x2BB4BC) ps2.ee.pc = 0x2BB4D0;
             }
 
             // Render

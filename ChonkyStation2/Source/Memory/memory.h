@@ -22,8 +22,8 @@ public:
 	// Memory regions
 	u8* ram = new u8[32 MB];
 	u8* iop_ram = new u8[2 MB];
-	u8* vu0_code_mem = new u8[16 KB];
-	u8* vu0_data_mem = new u8[16 KB];
+	u8* vu0_code_mem = new u8[4 KB];
+	u8* vu0_data_mem = new u8[4 KB];
 	u8* vu1_code_mem = new u8[16 KB];
 	u8* vu1_data_mem = new u8[16 KB];
 	u8* scratchpad = new u8[16 KB];
@@ -45,8 +45,10 @@ public:
 	uint16_t tmr1_stub = 0;
 
 	// SPU2 stub
-	u16 corestat = 0;
-	u16 coreattr = 0;
+	u16 core0stat = 0;
+	u16 core0attr = 0;
+	u16 core1stat = 0;
+	u16 core1attr = 0;
 
 	// Memory reading/writing
 	u32 iop_i_ctrl;

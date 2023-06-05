@@ -29,6 +29,7 @@ public:
 	int current_nloop = 0;
 
 	void PackedTransfer(u128 qword);
+	void ReglistTransfer(u64 dword);
 	void ImageTransfer(u128 qword);
 
 	u32 ctrl = 0;

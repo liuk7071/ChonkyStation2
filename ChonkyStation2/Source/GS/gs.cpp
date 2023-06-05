@@ -108,13 +108,13 @@ void GS::PushXYZ(Vertex vertex) {
 	vertex.col.b() = rgbaq.b;
 	vertex.col.a() = rgbaq.a;
 	Helpers::Debug(Helpers::Log::GSd, "Queued vertex:\n");
-	Helpers::Debug(Helpers::Log::GSd, "x: %d\n", vertex.coords.x());
-	Helpers::Debug(Helpers::Log::GSd, "y: %d\n", vertex.coords.y());
-	Helpers::Debug(Helpers::Log::GSd, "z: %d\n", vertex.coords.z());
-	Helpers::Debug(Helpers::Log::GSd, "r: %d\n", vertex.col.r());
-	Helpers::Debug(Helpers::Log::GSd, "g: %d\n", vertex.col.g());
-	Helpers::Debug(Helpers::Log::GSd, "b: %d\n", vertex.col.b());
-	Helpers::Debug(Helpers::Log::GSd, "a: %d\n", vertex.col.a());
+	Helpers::Debug(Helpers::Log::GSd, "x: %f\n", vertex.coords.x());
+	Helpers::Debug(Helpers::Log::GSd, "y: %f\n", vertex.coords.y());
+	Helpers::Debug(Helpers::Log::GSd, "z: %f\n", vertex.coords.z());
+	Helpers::Debug(Helpers::Log::GSd, "r: %f\n", vertex.col.r());
+	Helpers::Debug(Helpers::Log::GSd, "g: %f\n", vertex.col.g());
+	Helpers::Debug(Helpers::Log::GSd, "b: %f\n", vertex.col.b());
+	Helpers::Debug(Helpers::Log::GSd, "a: %f\n", vertex.col.a());
 	vertex_queue.push_back(vertex);
 
 	// Drawing kick

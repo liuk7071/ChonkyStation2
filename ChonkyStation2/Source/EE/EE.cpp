@@ -1,7 +1,7 @@
 #pragma warning(disable : 4996) // Stupid fread warning
 #include "EE.h"
 
-#define FASTBOOT
+//#define FASTBOOT
 
 #ifdef LOG_EE
 #define trace(fmt, ...) \
@@ -26,6 +26,9 @@ EE::EE(Memory* memptr) {
 	mem->t1.id = 1;
 	mem->t2.id = 2;
 	mem->t3.id = 3;
+
+	vu.vu0_code_mem = mem->vu0_code_mem;
+	vu.vu0_data_mem = mem->vu0_data_mem;
 }
 
 void EE::Exception(unsigned int exception, bool int1) {
@@ -45,6 +48,7 @@ void EE::Exception(unsigned int exception, bool int1) {
 	if (exception == Exceptions::Interrupt) pc = 0x80000200;
 	else pc = 0x80000180;
 
+	cop0r[13].b64[0] &= ~(1 << 11);
 	cop0r[13].b64[0] |= int1 << 11; // CAUSE
 }
 
@@ -524,7 +528,7 @@ void EE::Execute(Instruction instr) {
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02a\\demo2a.elf");
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\ps2tut\\ps2tut\\ps2tut_02b\\demo2b.elf");
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\graph.elf");
-					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\cube.elf");
+					pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\cube.elf");
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\SLES_525.63");
 					//pc = mem->LoadELF("C:\\Users\\zacse\\Downloads\\SLUS_211.13");
 					//branch_pc = std::nullopt;
@@ -557,26 +561,216 @@ void EE::Execute(Instruction instr) {
 	}
 	case COP1: {
 		switch (instr.rs) {
-		case FPU::MTC1: {
-			fprs[instr.rd] = gprs[instr.rt].b32[0];
-			trace(Helpers::Log::EEd, "mtc1 r%d, f%d\n", instr.rt, instr.rd);
+		case FPU::MFC1: {
+			gprs[instr.rt].b64[0] = (u64)(s32)fprs[instr.fs];
+			trace(Helpers::Log::EEd, "mfc1 r%d, f%d\n", instr.rt, instr.fs);
 			break;
 		}
-		// SPECIAL1
+		case FPU::CFC1: {
+			if (instr.fs != 31) {
+				Helpers::Panic("CFC1 with instr.rs != 31\n");
+			}
+			gprs[instr.rt].b32[0] = fcr31;
+			trace(Helpers::Log::EEd, "cfc1\n");
+			break;
+		}
+		case FPU::MTC1: {
+			fprs[instr.fd] = *(u32*)&gprs[instr.rt].b32[0];
+			Helpers::Debug(Helpers::Log::NOCOND, "mtc1 r%d, f%d ; (f%d = %f)\n", instr.rt.Value(), instr.rd.Value(), instr.rd.Value(), *(float*)&fprs[instr.fd]);
+			break;
+		}
+		case FPU::CTC1: {
+			if (instr.fs != 31 && (instr.fs != 0)) {
+				Helpers::Panic("CTC1 with instr.rs != 31 or 0 (instr.rs = %d)\n", instr.rs.Value());
+			}
+			trace(Helpers::Log::EEd, "ctc1\n");
+			if (instr.fs == 0) break;
+			fcr31 = gprs[instr.rt].b32[0];
+			break;
+		}
+		case FPU::BC1: {
+			switch (instr.ft) {
+			case BC1::BC1F: {
+				u32 offset = instr.imm;
+				if (!((fcr31 >> 23) & 1)) {
+					branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+				}
+				trace(Helpers::Log::EEd, "bc1f\n");
+				break;
+			}
+			case BC1::BC1T: {
+				u32 offset = instr.imm;
+				if ((fcr31 >> 23) & 1) {
+					branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+				}
+				trace(Helpers::Log::EEd, "bc1t\n");
+				break;
+			}
+			case BC1::BC1FL: {
+				u32 offset = instr.imm;
+				if (!((fcr31 >> 23) & 1)) {
+					branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+				}
+				else {
+					pc += 4;
+				}
+				trace(Helpers::Log::EEd, "bc1fl\n");
+				break;
+			}
+			case BC1::BC1TL: {
+				u32 offset = instr.imm;
+				if ((fcr31 >> 23) & 1) {
+					branch_pc = ((pc + 4) + (u32)(s16)(offset << 2));
+				}
+				else {
+					pc += 4;
+				}
+				trace(Helpers::Log::EEd, "bc1tl\n");
+				break;
+			}
+			default:
+				Helpers::Panic("Unimplemented FPU BC1 instruction 0x%02x\n", instr.ft.Value());
+			}
+			break;
+		}
+		// FPU.S
 		case 0x10: {
 			switch (instr.raw & 0x3f) {
+			case FPU_S::ADD_S: {
+				float res = *(float*)&fprs[instr.fs] + *(float*)&fprs[instr.ft];
+				fprs[instr.fd] = *(u32*)&res;
+				Helpers::Debug(Helpers::Log::NOCOND, "add.s f%d, f%d, f%d ; (f%d = %f)\n", instr.fd.Value(), instr.fs.Value(), instr.ft.Value(), instr.fd.Value(), *(float*)&fprs[instr.fd]);
+				break;
+			}
+			case FPU_S::SUB_S: {
+				float res = *(float*)&fprs[instr.fs] - *(float*)&fprs[instr.ft];
+				fprs[instr.fd] = *(u32*)&res;
+				Helpers::Debug(Helpers::Log::NOCOND, "add.s f%d, f%d, f%d ; (f%d = %f)\n", instr.fd.Value(), instr.fs.Value(), instr.ft.Value(), instr.fd.Value(), *(float*)&fprs[instr.fd]);
+				break;
+			}
+			case FPU_S::MUL_S: {
+				float res = *(float*)&fprs[instr.fs] * *(float*)&fprs[instr.ft];
+				fprs[instr.fd] = *(u32*)&res;
+				Helpers::Debug(Helpers::Log::NOCOND, "mul.s f%d, f%d, f%d ; (f%d = %f)\n", instr.fd.Value(), instr.fs.Value(), instr.ft.Value(), instr.fd.Value(), *(float*)&fprs[instr.fd]);
+				break;
+			}
+			case FPU_S::DIV_S: {
+				Helpers::Debug(Helpers::Log::NOCOND, "div.s f%d, f%d, f%d ", instr.fd.Value(), instr.fs.Value(), instr.ft.Value());
+				if (*(float*)&fprs[instr.ft] == 0.f) {
+					Helpers::Panic("\nDIV.S DIVISION BY 0 (%f / %f)\n", *(float*)&fprs[instr.fs], *(float*)&fprs[instr.ft]);
+				}
+				float res = *(float*)&fprs[instr.fs] / *(float*)&fprs[instr.ft];
+				fprs[instr.fd] = *(u32*)&res;
+				Helpers::Debug(Helpers::Log::NOCOND, "; (f%d = %f)\n", instr.fd.Value(), *(float*)&fprs[instr.fd]);
+				break;
+			}
+			case FPU_S::SQRT_S: {
+				float res = sqrt(*(float*)&fprs[instr.ft]);
+				fprs[instr.fd] = *(u32*)&res;
+				trace(Helpers::Log::EEd, "sqrt.s f%d, f%d\n", instr.fd, instr.ft);
+				break;
+			}
+			case FPU_S::MOV_S: {
+				fprs[instr.fd] = *(u32*)&fprs[instr.fs];
+				trace(Helpers::Log::EEd, "mov.s f%d, f%d\n", instr.fd, instr.fs);
+				break;
+			}
+			case FPU_S::NEG_S: {
+				fprs[instr.fd] = -*(s32*)&fprs[instr.fs];
+				trace(Helpers::Log::EEd, "neg.s f%d, f%d\n", instr.fd, instr.fs);
+				break;
+			}
+			case FPU_S::ADDA_S: {
+				acc = *(float*)&fprs[instr.fs] + *(float*)&fprs[instr.ft];
+				trace(Helpers::Log::EEd, "adda.s f%d, f%d\n", instr.fs, instr.ft);
+				break;
+			}
+			case FPU_S::MADD_S: {
+				float res = *(float*)&fprs[instr.fs] * *(float*)&fprs[instr.ft] + acc;
+				fprs[instr.fd] = *(u32*)&res;
+				Helpers::Debug(Helpers::Log::NOCOND, "madd.s f%d, f%d, f%d ; (f%d = %f)\n", instr.fd.Value(), instr.fs.Value(), instr.ft.Value(), instr.fd.Value(), *(float*)&fprs[instr.fd]);
+				break;
+			}
+			case FPU_S::CVT_W: {
+				fprs[instr.fd] = (s32)*(float*)&fprs[instr.fs];
+				trace(Helpers::Log::EEd, "cvt.w f%d, f%d\n", instr.fd, instr.fs);
+				break;
+			}
+			case FPU_S::CEQ_S: {
+				fcr31 &= ~(1 << 23);
+				fcr31 |= ((*(float*)&fprs[instr.fs] == *(float*)&fprs[instr.ft]) << 23);
+				trace(Helpers::Log::EEd, "c.eq.s f%d, f%d\n", instr.fs, instr.ft);
+				break;
+			}
+			case FPU_S::CLT_S: {
+				fcr31 &= ~(1 << 23);
+				fcr31 |= ((*(float*)&fprs[instr.fs] < *(float*)&fprs[instr.ft]) << 23);
+				trace(Helpers::Log::EEd, "c.lt.s f%d, f%d\n", instr.fs, instr.ft);
+				break;
+			}
+			case FPU_S::CLE_S: {
+				fcr31 &= ~(1 << 23);
+				fcr31 |= ((*(float*)&fprs[instr.fs] <= *(float*)&fprs[instr.ft]) << 23);
+				trace(Helpers::Log::EEd, "c.le.s f%d, f%d\n", instr.fs, instr.ft);
+				break;
+			}
 			default:
-				printf("Unimplemented FPU SPECIAL1 instruction 0x%02x\n", instr.raw & 0x3f);
+				Helpers::Panic("Unimplemented FPU S instruction 0x%02x\n", instr.raw & 0x3f);
+			}
+			break;
+		}
+		// FPU.W
+		case 0x14: {
+			switch (instr.raw & 0x3f) {
+			// CVT.S
+			case 0x20: {
+				fprs[instr.fd] = (float)(s32)fprs[instr.fs];
+				trace(Helpers::Log::EEd, "cvt.s f%d, f%d\n", instr.fd, instr.fs);
+				break;
+			}
+			default:
+				Helpers::Panic("Unimplemented FPU W instruction 0x%02x\n", instr.raw & 0x3f);
 			}
 			break;
 		}
 		default:
-			printf("Unimplemented FPU instruction 0x%02x\n", instr.rs.Value());
+			Helpers::Panic("Unimplemented FPU instruction 0x%02x\n", instr.rs.Value());
 		}
 		break;
 	}
 	case COP2: {
-		printf("Unimplemented COP2 instruction 0x%08x\n", instr.raw);
+		switch (instr.rs) {
+		case 0x01: {	// QMFC2
+			gprs[instr.rt].b32[0] = vu.vf[instr.fd][0];
+			gprs[instr.rt].b32[1] = vu.vf[instr.fd][1];
+			gprs[instr.rt].b32[2] = vu.vf[instr.fd][2];
+			gprs[instr.rt].b32[3] = vu.vf[instr.fd][3];
+			trace(Helpers::Log::EEd, "qmfc2\n");
+			break;
+		}
+		case 0x02: {	// CFC2	(stubbed)
+			gprs[instr.rt].b32[0] = 0;
+			trace(Helpers::Log::EEd, "cfc2\n");
+			break;
+		}
+		case 0x05: {	// QMTC2
+			vu.vf[instr.fd][0] = gprs[instr.rt].b32[0];
+			vu.vf[instr.fd][1] = gprs[instr.rt].b32[1];
+			vu.vf[instr.fd][2] = gprs[instr.rt].b32[2];
+			vu.vf[instr.fd][3] = gprs[instr.rt].b32[3];
+			trace(Helpers::Log::EEd, "qmtc2\n");
+			break;
+		}
+		case 0x06: {	// CTC2 (stubbed)
+			if (instr.is < 16) {
+				vu.vi[instr.is] = gprs[instr.rt].b16[0];
+			}
+			trace(Helpers::Log::EEd, "ctc2\n");
+			break;
+		}
+		default:
+			vu.ExecVU0Macro(instr);
+		}
 		break;
 	}
 	case BEQL: {
@@ -692,12 +886,47 @@ void EE::Execute(Instruction instr) {
 				trace(Helpers::Log::EEd, "pextlw %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
 				break;
 			}
+			case PEXTLH: {
+				gprs[instr.rd].b16[0] = gprs[instr.rt].b16[0];
+				gprs[instr.rd].b16[1] = gprs[instr.rs].b16[0];
+				gprs[instr.rd].b16[2] = gprs[instr.rt].b16[1];
+				gprs[instr.rd].b16[3] = gprs[instr.rs].b16[1];
+				gprs[instr.rd].b16[4] = gprs[instr.rt].b16[2];
+				gprs[instr.rd].b16[5] = gprs[instr.rs].b16[2];
+				gprs[instr.rd].b16[6] = gprs[instr.rt].b16[3];
+				gprs[instr.rd].b16[7] = gprs[instr.rs].b16[3];
+				trace(Helpers::Log::EEd, "pextlh %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				break;
+			}
 			case PADDSH: {
 				// TODO: Saturate overflow to 0x7fff, saturate underflow to 0x8000
 				for (int i = 0; i < 8; i++) {
 					gprs[instr.rd].b16[i] = gprs[instr.rs].b16[i] + gprs[instr.rt].b16[i];
 				}
 				trace(Helpers::Log::EEd, "paddsh %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
+				break;
+			}
+			case PEXT5: {
+				gprs[instr.rd].b8[0] = (gprs[instr.rt].b16[0] & 0x1f) << 2;
+				gprs[instr.rd].b8[1] = ((gprs[instr.rt].b16[0] >> 5) & 0x1f) << 2;
+				gprs[instr.rd].b8[2] = ((gprs[instr.rt].b16[0] >> 10) & 0x1f) << 2;
+				gprs[instr.rd].b8[3] = (gprs[instr.rt].b16[0] >> 15) << 7;
+
+				gprs[instr.rd].b8[4] = (gprs[instr.rt].b16[2] & 0x1f) << 2;
+				gprs[instr.rd].b8[5] = ((gprs[instr.rt].b16[2] >> 5) & 0x1f) << 2;
+				gprs[instr.rd].b8[6] = ((gprs[instr.rt].b16[2] >> 10) & 0x1f) << 2;
+				gprs[instr.rd].b8[7] = (gprs[instr.rt].b16[2] >> 15) << 7;
+
+				gprs[instr.rd].b8[8] = (gprs[instr.rt].b16[4] & 0x1f) << 2;
+				gprs[instr.rd].b8[9] = ((gprs[instr.rt].b16[4] >> 5) & 0x1f) << 2;
+				gprs[instr.rd].b8[10] = ((gprs[instr.rt].b16[4] >> 10) & 0x1f) << 2;
+				gprs[instr.rd].b8[11] = (gprs[instr.rt].b16[4] >> 15) << 7;
+
+				gprs[instr.rd].b8[12] = (gprs[instr.rt].b16[6] & 0x1f) << 2;
+				gprs[instr.rd].b8[13] = ((gprs[instr.rt].b16[6] >> 5) & 0x1f) << 2;
+				gprs[instr.rd].b8[14] = ((gprs[instr.rt].b16[6] >> 10) & 0x1f) << 2;
+				gprs[instr.rd].b8[15] = (gprs[instr.rt].b16[6] >> 15) << 7;
+				trace(Helpers::Log::EEd, "pext5 %s, %s, %s", gpr[instr.rd.Value()].c_str(), gpr[instr.rs.Value()].c_str(), gpr[instr.rt.Value()].c_str());
 				break;
 			}
 			case PPAC5: {
@@ -1013,7 +1242,7 @@ void EE::Execute(Instruction instr) {
 	}
 	case SW: {
 		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
-		trace(Helpers::Log::EEd, "sw, %s, 0x%04x(%s) ; mem[0x%08x] <- 0x%04x\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), address, gprs[instr.rt.Value()].b32[0]);
+		trace(Helpers::Log::EEd, "sw %s, 0x%04x(%s) ; mem[0x%08x] <- 0x%04x\n", gpr[instr.rt.Value()].c_str(), instr.imm.Value(), gpr[instr.rs.Value()].c_str(), address, gprs[instr.rt.Value()].b32[0]);
 		if (address & 3) {
 			// TODO: Handle exceptions
 			// Panic for now
@@ -1069,18 +1298,43 @@ void EE::Execute(Instruction instr) {
 		break;
 	}
 	case LQC2: {
+		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
+		vu.vf[instr.ft][x] = mem->Read<u32>(address + 0);
+		vu.vf[instr.ft][y] = mem->Read<u32>(address + 4);
+		vu.vf[instr.ft][z] = mem->Read<u32>(address + 8);
+		vu.vf[instr.ft][w] = mem->Read<u32>(address + 0xC);
 		trace(Helpers::Log::EEd, "lqc2\n");
 		break;
 	}
 	case LWC1: {
-		trace(Helpers::Log::EEd, "lwc1\n");
+		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
+		if (address & 3) {
+			// TODO: Handle exceptions
+			// Panic for now
+			Helpers::Panic("Unhandled Address Error (lw addr: 0x%08x)\n", address);
+		}
+		u32 data = mem->Read<u32>(address);
+		fprs[instr.ft] = *(u32*)&data;
+		Helpers::Debug(Helpers::Log::NOCOND, "lwc1\n");
 		break;
 	}
 	case SWC1: {
-		trace(Helpers::Log::EEd, "swc1\n");
+		Helpers::Debug(Helpers::Log::NOCOND, "swc1\n");
+		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
+		if (address & 3) {
+			// TODO: Handle exceptions
+			// Panic for now
+			Helpers::Panic("Unhandled Address Error (swc1)\n");
+		}
+		mem->Write<u32>(address, fprs[instr.ft]);
 		break;
 	}
 	case SQC2: {
+		u32 address = (gprs[instr.rs].b32[0] + (u32)(s16)instr.imm);
+		mem->Write<u32>(address + 0x0, vu.vf[instr.ft][x]);
+		mem->Write<u32>(address + 0x4, vu.vf[instr.ft][y]);
+		mem->Write<u32>(address + 0x8, vu.vf[instr.ft][z]);
+		mem->Write<u32>(address + 0xC, vu.vf[instr.ft][w]);
 		trace(Helpers::Log::EEd, "sqc2\n");
 		break;
 	}
@@ -1192,12 +1446,21 @@ void EE::Step() {
 		}
 	}
 
-	if ((mem->intc_stat & mem->intc_mask) && (cop0r[12].b64[0] & 1) && ((cop0r[12].b64[0] >> 16) & 1) && !((cop0r[12].b64[0] >> 1) & 1) && !((cop0r[12].b64[0] >> 2) & 1)) {
+	if (mem->intc_stat & mem->intc_mask) {
 		cop0r[13].b64[0] |= 1 << 10;
-		if (cop0r[12].b64[0] & (1 << 10)) {
-			printf("[INTC] INT0\n");
-			Exception(Exceptions::Interrupt, false);
-		}
+	} else {
+		cop0r[13].b64[0] &= ~(1 << 10);
+	}
+
+	if	(
+		   (cop0r[12].b64[0] & 1) 
+		&& ((cop0r[12].b64[0] >> 16) & 1) 
+		&& !((cop0r[12].b64[0] >> 1) & 1) 
+		&& !((cop0r[12].b64[0] >> 2) & 1) 
+		&& ((cop0r[12].b64[0] & (1 << 10)) && (cop0r[13].b64[0] & (1 << 10)))
+		) {
+		printf("[INTC] INT0\n");
+		Exception(Exceptions::Interrupt, false);
 	}
 
 #ifdef BIOS_HLE

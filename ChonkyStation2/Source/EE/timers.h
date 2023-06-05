@@ -61,7 +61,7 @@ public:
 			}
 		}
 		else {
-			Helpers::Panic("Unimplemented IOP Timer external signal bit\n");
+			//Helpers::Panic("Unimplemented IOP Timer external signal bit\n");
 		}
 	}
 };

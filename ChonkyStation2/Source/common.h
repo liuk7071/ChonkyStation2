@@ -33,6 +33,29 @@ struct Vertex {
 	vec4 col;
 };
 
+union Instruction {
+	u32 raw;
+	BitField<0, 16, u32> imm;
+	BitField<0, 26, u32> jump_imm;
+	BitField<6, 5, u32>  sa;
+	BitField<11, 5, u32> rd;
+	BitField<16, 5, u32> rt;
+	BitField<21, 5, u32> rs;
+
+	BitField<6, 5, u32> fd;
+	BitField<11, 5, u32> fs;
+	BitField<16, 5, u32> ft;
+
+	
+	BitField<6, 5, u32> id;
+	BitField<11, 5, u32> is;
+	BitField<16, 5, u32> it;
+	BitField<21, 4, u32> dest;
+
+	BitField<21, 2, u32> fsf;
+	BitField<23, 2, u32> ftf;
+};
+
 #define UNITS
 #define KB *1024
 #define MB *1 KB*1024
@@ -57,7 +80,7 @@ namespace Helpers {
 //#define LOG_EE
 //#define LOG_MEM
 //#define LOG_DMA
-//#define LOG_GIF
+#define LOG_GIF
 #define LOG_GS
 //#define LOG_SIF
 //#define LOG_CDVD

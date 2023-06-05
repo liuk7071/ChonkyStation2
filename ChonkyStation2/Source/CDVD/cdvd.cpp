@@ -45,6 +45,12 @@ void CDVD::SendSCommand(u8 cmd) {
 		s_response_length = 8;
 		break;
 	}
+	case S_COMMANDS::ForbidDVD: {
+		s_command_status.data_available = 0;
+		s_response_length = 1;
+		s_result.push(0x5);
+		break;
+	}
 	case S_COMMANDS::OpenConfig: {
 		s_command_status.data_available = 0;
 		s_response_length = 1;
@@ -55,15 +61,25 @@ void CDVD::SendSCommand(u8 cmd) {
 		s_response_length = 4 * 4;
 		break;
 	}
+	case S_COMMANDS::CloseConfig: {
+		s_command_status.data_available = 0;
+		s_response_length = 1;
+		break;
+	}
 	default:
-		Helpers::Panic("Unhandled CDVD S Command");
+		Helpers::Panic("Unhandled CDVD S Command 0x%02x\n", cmd);
 	}
 }
 
 u32 CDVD::ReadSCommandResponse() {
 	s_response_length--;
 	if (s_response_length == 0) s_command_status.data_available = 1;
-	return 0;
+	u8 ret = 0;
+	if (!s_result.empty()) {
+		ret = s_result.front();
+		s_result.pop();
+	}
+	return ret;
 }
 
 void CDVD::SendSParameter(u8 param) {

@@ -30,6 +30,7 @@ public:
 	S_COMMAND_STATUS s_command_status;
 
 	std::queue<u8> s_params;
+	std::queue<u8> s_result;
 	void SendSParameter(u8 param);
 	void SendSCommand(u8 cmd);
 	u32 ReadSCommandResponse();
@@ -38,8 +39,10 @@ public:
 		Subcommand		  = 0x03,
 		UpdateStickyFlags = 0x05,
 		ReadRTC           = 0x08,
+		ForbidDVD		  = 0x15,
 		OpenConfig        = 0x40,
-		ReadConfig        = 0x41
+		ReadConfig        = 0x41,
+		CloseConfig		  = 0x43
 	};
 
 	int sector_buffer_index = 0;

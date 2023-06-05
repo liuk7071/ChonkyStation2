@@ -1,6 +1,8 @@
 #pragma once
 #include "../common.h"
 #include "../Memory/memory.h";
+#include "vu.h"
+#include <cmath>
 
 //#define BIOS_HLE
 
@@ -9,13 +11,16 @@ public:
 	EE(Memory* memptr);
 	Memory* mem;
 
+	VU vu;
 	void Step();
 	bool traceb = false;
 	bool sideload_elf = true;
 
 	// Registers
 	u128 gprs[32];
-	float fprs[32];
+	u32 fprs[32];
+	float acc;
+	u32 fcr31;
 	u128 lo, hi;
 	u128 cop0r[31];
 	std::string gpr[32] = { "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3", "$t0", "$t1", "$t2", "$t3","$t4", "$t5", "$t6", "$t7", "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7","$t8", "$t9", "$k0", "$k1", "$gp", "$sp", "$fp", "$ra" };
@@ -32,15 +37,6 @@ public:
 	void Exception(unsigned int exception, bool int1 = false);
 
 	// Instructions
-	union Instruction {
-		u32 raw;
-		BitField<0, 16, u32> imm;
-		BitField<0, 26, u32> jump_imm;
-		BitField<6, 5, u32>  sa;
-		BitField<11, 5, u32> rd;
-		BitField<16, 5, u32> rt;
-		BitField<21, 5, u32> rs;
-	};
 	void Execute(Instruction instruction);
 	enum Instructions {
 		SPECIAL = 0x00,
@@ -174,7 +170,9 @@ public:
 		PSUBW  = 0x01,
 		PSUBB  = 0x09,
 		PEXTLW = 0x12,
+		PEXTLH = 0x16,
 		PADDSH = 0x17,
+		PEXT5  = 0x1e,
 		PPAC5  = 0x1f
 	};
 	enum MMI1 {
@@ -204,7 +202,32 @@ public:
 		TLB  = 0x10
 	};
 	enum FPU {
+		MFC1 = 0x00,
+		CFC1 = 0x02,
 		MTC1 = 0x04,
+		CTC1 = 0x06,
+		BC1  = 0x08,
+	};
+	enum BC1 {
+		BC1F  = 0x00,
+		BC1T  = 0x01,
+		BC1FL = 0x02,
+		BC1TL = 0x03
+	};
+	enum FPU_S {
+		ADD_S  = 0x00,
+		SUB_S  = 0x01,
+		MUL_S  = 0x02,
+		DIV_S  = 0x03,
+		SQRT_S = 0x04,
+		MOV_S  = 0x06,
+		NEG_S  = 0x07,
+		ADDA_S = 0x18,
+		MADD_S = 0x1c,
+		CVT_W  = 0x24,
+		CEQ_S  = 0x32,
+		CLT_S  = 0x34,
+		CLE_S  = 0x36
 	};
 	enum TLB {
 		TLBWI = 0x02,

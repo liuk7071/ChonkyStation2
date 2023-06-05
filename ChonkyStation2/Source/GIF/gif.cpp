@@ -37,6 +37,16 @@ void GIF::PackedTransfer(u128 qword) {
 	}
 }
 
+void GIF::ReglistTransfer(u64 dword) {
+	gs->WriteInternalRegister(regs[current_reg], dword);
+
+	current_nloop--;
+	if (current_nloop == 0) {
+		current_nloop = nloop;
+		current_reg++;
+	}
+}
+
 void GIF::ImageTransfer(u128 qword) {
 	gs->PushHWREG(qword.b64[0]);
 	gs->PushHWREG(qword.b64[1]);
@@ -48,7 +58,7 @@ void GIF::ImageTransfer(u128 qword) {
 
 u32 GIF::SendQWord(u128 qword, void* gifptr) {
 	GIF* gif = (GIF*)gifptr;
-	if ((gif->data_format == DataFormat::PACKED) && (gif->current_reg == gif->nregs)) gif->has_tag = false;
+	if (((gif->data_format == DataFormat::PACKED) || (gif->data_format == DataFormat::REGLIST)) && (gif->current_reg == gif->nregs)) gif->has_tag = false;
 	if (!gif->has_tag) {
 		gif->ParseGIFTag(qword);
 		return 0;
@@ -57,6 +67,10 @@ u32 GIF::SendQWord(u128 qword, void* gifptr) {
 		switch (gif->data_format) {
 		case DataFormat::PACKED:
 			gif->PackedTransfer(qword);
+			break;
+		case DataFormat::REGLIST:
+			gif->ReglistTransfer(qword.b64[0]);
+			gif->ReglistTransfer(qword.b64[1]);
 			break;
 		case DataFormat::IMAGE:
 			gif->ImageTransfer(qword);
